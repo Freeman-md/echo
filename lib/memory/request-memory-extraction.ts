@@ -2,7 +2,7 @@ import type {
   EventMemoryError,
   EventMemoryResponse,
 } from "@/types/memory";
-import { getSupabaseClient } from "@/lib/supabase/client";
+import { getCurrentSession } from "@/lib/supabase/access-token";
 
 const inFlightRequests = new Map<string, Promise<EventMemoryResponse>>();
 
@@ -23,23 +23,13 @@ interface MemoryExtractionOptions {
 async function makeRequest(
   eventId: string,
   options: MemoryExtractionOptions,
+  accessToken: string,
 ): Promise<EventMemoryResponse> {
-  const {
-    data: { session },
-  } = await getSupabaseClient().auth.getSession();
-
-  if (!session?.access_token) {
-    throw new EventMemoryRequestError(
-      "Sign in before generating event memories.",
-      "unauthorized",
-    );
-  }
-
   const response = await fetch("/api/memory-extraction", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify({
       eventId,
@@ -60,17 +50,27 @@ async function makeRequest(
   return payload;
 }
 
-export function requestMemoryExtraction(
+export async function requestMemoryExtraction(
   eventId: string,
   options: MemoryExtractionOptions = {},
 ): Promise<EventMemoryResponse> {
-  const requestKey = `${eventId}:${options.forceRefresh ? "refresh" : "load"}`;
+  const session = await getCurrentSession().catch(() => {
+    throw new EventMemoryRequestError(
+      "Sign in before generating event memories.",
+      "unauthorized",
+    );
+  });
+  const requestKey = `${session.user.id}:${eventId}:${
+    options.forceRefresh ? "refresh" : "load"
+  }`;
   const existing = inFlightRequests.get(requestKey);
   if (existing) return existing;
 
-  const request = makeRequest(eventId, options).finally(() => {
+  const request = makeRequest(eventId, options, session.access_token).finally(
+    () => {
     inFlightRequests.delete(requestKey);
-  });
+    },
+  );
   inFlightRequests.set(requestKey, request);
   return request;
 }

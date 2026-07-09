@@ -76,7 +76,7 @@ export function AuthScreen() {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="you@example.com"
-              className="event-field mt-2 text-sm"
+              className="event-field mt-2 text-base sm:text-sm"
             />
           </label>
           <label className="block">
@@ -89,7 +89,7 @@ export function AuthScreen() {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="At least 6 characters"
-              className="event-field mt-2 text-sm"
+              className="event-field mt-2 text-base sm:text-sm"
             />
           </label>
 

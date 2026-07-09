@@ -46,5 +46,5 @@ export function AuthGate() {
     );
   }
 
-  return user ? <EchoApp user={user} /> : <AuthScreen />;
+  return user ? <EchoApp key={user.id} user={user} /> : <AuthScreen />;
 }

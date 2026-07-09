@@ -26,6 +26,19 @@ export async function createEvent(input: CreateEventInput): Promise<Event> {
     .select("*")
     .single();
 
+  if (error?.code === "23505") {
+    const { data: existing, error: existingError } = await getSupabaseClient()
+      .from("events")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!existingError && existing) return existing as Event;
+  }
+
   if (error) throw new Error(`Could not start event: ${error.message}`);
 
   return data as Event;

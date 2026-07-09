@@ -3,6 +3,7 @@ import type {
   TranscriptionErrorResponse,
   TranscriptionResponse,
 } from "@/types/conversation-capture";
+import { getCurrentAccessToken } from "@/lib/supabase/access-token";
 
 export type TranscriptionRequestErrorCode =
   | TranscriptionErrorCode
@@ -56,13 +57,15 @@ function isTranscriptionErrorResponse(
   );
 }
 
-export function requestTranscription(
+export async function requestTranscription(
   audio: File,
   {
     onUploadProgress,
     onUploadComplete,
   }: RequestTranscriptionOptions,
 ): Promise<TranscriptionResponse> {
+  const accessToken = await getCurrentAccessToken();
+
   return new Promise((resolve, reject) => {
     const formData = new FormData();
     formData.append("audio", audio);
@@ -71,6 +74,7 @@ export function requestTranscription(
     let uploadCompleted = false;
 
     request.open("POST", "/api/transcription");
+    request.setRequestHeader("Authorization", `Bearer ${accessToken}`);
     request.timeout = 150_000;
 
     request.upload.addEventListener("progress", (event) => {

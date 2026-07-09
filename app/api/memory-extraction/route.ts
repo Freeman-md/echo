@@ -11,7 +11,11 @@ import {
   persistExtractedMemory,
   repairPeopleFromCheckpoint,
 } from "@/lib/services/memory-service";
-import { getServerSupabaseClient } from "@/lib/supabase/server";
+import {
+  ApiAuthenticationError,
+  authenticateApiRequest,
+  type AuthenticatedApiContext,
+} from "@/lib/supabase/api-auth";
 import type {
   EventMemoryError,
   EventMemoryResponse,
@@ -111,32 +115,17 @@ async function processEventMemory(
 export async function POST(request: Request) {
   let eventId: string;
   let forceRefresh: boolean;
+  let auth: AuthenticatedApiContext;
 
-  const authorization = request.headers.get("authorization");
-  const accessToken = authorization?.startsWith("Bearer ")
-    ? authorization.slice(7)
-    : null;
-
-  if (!accessToken) {
+  try {
+    auth = await authenticateApiRequest(request);
+  } catch (error) {
     return NextResponse.json<EventMemoryError>(
       {
-        error: "Sign in before generating event memories.",
-        code: "unauthorized",
-      },
-      { status: 401 },
-    );
-  }
-
-  const supabase = getServerSupabaseClient(accessToken);
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser(accessToken);
-
-  if (authError || !user) {
-    return NextResponse.json<EventMemoryError>(
-      {
-        error: "Your session has expired. Sign in again.",
+        error:
+          error instanceof ApiAuthenticationError
+            ? error.message
+            : "Sign in before generating event memories.",
         code: "unauthorized",
       },
       { status: 401 },
@@ -158,10 +147,11 @@ export async function POST(request: Request) {
   }
 
   // Coalesce duplicate requests from React Strict Mode or quick repeated taps.
-  const jobKey = `${user.id}:${eventId}:${forceRefresh ? "refresh" : "load"}`;
+  const jobKey = `${auth.user.id}:${eventId}:${forceRefresh ? "refresh" : "load"}`;
   const existingJob = activeExtractions.get(jobKey);
   const job =
-    existingJob ?? processEventMemory(supabase, eventId, forceRefresh);
+    existingJob ??
+    processEventMemory(auth.supabase, eventId, forceRefresh);
   if (!existingJob) activeExtractions.set(jobKey, job);
 
   try {

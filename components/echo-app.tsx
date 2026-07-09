@@ -153,6 +153,24 @@ export function EchoApp({ user }: EchoAppProps) {
             <div className="flex min-h-[36rem] items-center justify-center text-sm text-slate-500">
               Finding your current event…
             </div>
+          ) : eventsError ? (
+            <div className="flex min-h-[36rem] items-center justify-center">
+              <div className="glass-card max-w-md rounded-[1.75rem] px-6 py-9 text-center">
+                <h1 className="text-xl font-semibold text-white">
+                  Echo could not load your events
+                </h1>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  {eventsError}
+                </p>
+                <button
+                  type="button"
+                  onClick={retryEvents}
+                  className="button-secondary mx-auto mt-5 flex"
+                >
+                  Try again
+                </button>
+              </div>
+            </div>
           ) : (
             <EventLifecycle
               key={currentEvent?.id ?? "new-event"}
@@ -209,7 +227,10 @@ export function EchoApp({ user }: EchoAppProps) {
         </footer>
       </div>
 
-      <nav className="fixed inset-x-4 bottom-4 z-20 grid grid-cols-3 rounded-2xl border border-white/[0.09] bg-[#0b0c13]/95 p-1.5 shadow-2xl backdrop-blur-xl sm:hidden">
+      <nav
+        className="fixed inset-x-4 z-20 grid grid-cols-3 rounded-2xl border border-white/[0.09] bg-[#0b0c13]/95 p-1.5 shadow-2xl backdrop-blur-xl sm:hidden"
+        style={{ bottom: "max(1rem, env(safe-area-inset-bottom))" }}
+      >
         <MobileNavButton
           active={tab === "current"}
           onClick={() => setTab("current")}
