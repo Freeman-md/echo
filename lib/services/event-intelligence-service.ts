@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { memoryExtractionSchema } from "@/lib/memory/schema";
 import {
@@ -8,7 +9,6 @@ import {
   type EventIntelligenceReport,
   type StoredEventIntelligence,
 } from "@/lib/intelligence/schema";
-import { getServerSupabaseClient } from "@/lib/supabase/server";
 import type { Event, EventInsight, PersonMemory, Transcript } from "@/types";
 import type {
   EventIntelligenceErrorCode,
@@ -52,9 +52,9 @@ function hasMemoryCheckpoint(insight: EventInsight): boolean {
 }
 
 export async function loadEventIntelligenceSource(
+  supabase: SupabaseClient,
   eventId: string,
 ): Promise<EventIntelligenceSource> {
-  const supabase = getServerSupabaseClient();
   const [eventResult, peopleResult, transcriptResult, insightResult] =
     await Promise.all([
       supabase.from("events").select("*").eq("id", eventId).maybeSingle(),
@@ -201,9 +201,7 @@ export function buildSourceFingerprint(
         : null,
   };
 
-  return createHash("sha256")
-    .update(JSON.stringify(evidence))
-    .digest("hex");
+  return createHash("sha256").update(JSON.stringify(evidence)).digest("hex");
 }
 
 export function buildEventIntelligenceOverview(
@@ -231,10 +229,10 @@ export function buildEventIntelligenceOverview(
 }
 
 export async function persistEventIntelligence(
+  supabase: SupabaseClient,
   source: EventIntelligenceSource,
   report: EventIntelligenceReport,
 ): Promise<StoredEventIntelligence> {
-  const supabase = getServerSupabaseClient();
   const generatedAt = new Date().toISOString();
   const intelligence: StoredEventIntelligence = {
     schema_version: 1,
