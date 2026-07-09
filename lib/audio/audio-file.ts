@@ -27,7 +27,6 @@ const SUPPORTED_AUDIO_EXTENSIONS = new Set([
 ]);
 
 const SUPPORTED_AUDIO_MIME_TYPES = new Set([
-  "audio/aac",
   "audio/flac",
   "audio/m4a",
   "audio/mp4",

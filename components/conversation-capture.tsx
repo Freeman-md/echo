@@ -203,6 +203,8 @@ export function ConversationCapture({
     useState<RetryTranscript | null>(null);
 
   useEffect(() => {
+    isMountedRef.current = true;
+
     return () => {
       isMountedRef.current = false;
       recorderRef.current?.cancel();
