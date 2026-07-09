@@ -37,7 +37,7 @@ export default function Home() {
         </div>
 
         <footer className="mt-10 flex items-center justify-between border-t border-white/[0.06] py-6 text-xs text-slate-600">
-          <span>Echo · Milestone 1</span>
+          <span>Echo · Milestone 2</span>
           <span>Built for moments that matter.</span>
         </footer>
       </div>
