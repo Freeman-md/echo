@@ -2,9 +2,9 @@
 
 Never forget a conversation again.
 
-Echo is an AI memory system for real-world networking events. The current
-Milestone 1 build adds a lightweight event-clue flow, editable draft, persistent
-active event, and completed event shell to the mobile-first foundation.
+Echo is an AI memory system for real-world networking events. Milestone 1.1
+adds AI event understanding to the lightweight clue, draft, active-event, and
+completion flow.
 
 ## Run locally
 
@@ -22,10 +22,12 @@ project:
 ```dotenv
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+OPENAI_API_KEY=your-server-side-openai-api-key
 ```
 
 Only the public anonymous key belongs in the frontend. Never add a service role
-key to a `NEXT_PUBLIC_` variable.
+key to a `NEXT_PUBLIC_` variable. `OPENAI_API_KEY` is read only by the
+server-side enrichment route and must never use the `NEXT_PUBLIC_` prefix.
 
 ## Apply the database migration
 
@@ -53,9 +55,12 @@ ownership before storing real conversation data.
 5. Select **End Event** and verify that row has `status = completed` and an
    `ended_at` timestamp.
 
-URL names and screenshot metadata are inferred locally with deterministic
-logic. Screenshots are not uploaded. URL research, image understanding, audio,
-transcription, and AI enrichment are intentionally deferred.
+The server reads useful event-page text for URL clues and sends screenshots
+directly to OpenAI vision. OpenAI returns a schema-validated event profile,
+which populates the editable draft and is stored in the existing event context.
+Screenshots are not uploaded to Supabase or retained by Echo. If page fetching,
+the API route, or OpenAI fails, the original deterministic Milestone 1 draft is
+used automatically.
 
 ## Test the connection smoke test
 
@@ -79,7 +84,7 @@ npm run build
 
 ## Milestone boundary
 
-Milestone 1 does not include authentication, audio, transcription, OCR, web
-research, AI integration, memory extraction, storage uploads, or demo mode.
-React state is intentionally ephemeral, and application data is persisted only
-to Supabase when the user starts or completes an event.
+Milestone 1.1 adds only event enrichment. It does not include authentication,
+audio, transcription, separate OCR, people extraction, memory cards, event
+intelligence, follow-ups, storage uploads, or demo mode. React state remains
+ephemeral, and persistent application data is written only to Supabase.

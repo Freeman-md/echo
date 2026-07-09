@@ -27,9 +27,12 @@
   "homepage": "https://github.com/Freeman-md/echo#readme",
   "dependencies": {
     "@supabase/supabase-js": "^2.110.2",
+    "cheerio": "^1.2.0",
     "next": "^16.2.10",
+    "openai": "^6.46.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.2",
