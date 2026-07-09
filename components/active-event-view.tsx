@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { ConversationCapture } from "@/components/conversation-capture";
+import { MemoryCardsView } from "@/components/memory-cards/memory-cards-view";
 import type { Event } from "@/types";
 
 interface ActiveEventViewProps {
@@ -19,6 +20,7 @@ export function ActiveEventView({
   onEnd,
 }: ActiveEventViewProps) {
   const [isCaptureActive, setIsCaptureActive] = useState(false);
+  const [isMemoryProcessing, setIsMemoryProcessing] = useState(false);
   const startedAt = new Intl.DateTimeFormat(undefined, {
     hour: "numeric",
     minute: "2-digit",
@@ -75,17 +77,25 @@ export function ActiveEventView({
           <button
             type="button"
             onClick={onEnd}
-            disabled={isEnding || isCaptureActive}
+            disabled={isEnding || isCaptureActive || isMemoryProcessing}
             className="mt-5 flex min-h-12 w-full items-center justify-center rounded-full border border-rose-200/10 bg-rose-200/[0.055] px-5 text-sm font-semibold text-rose-100 transition hover:border-rose-200/20 hover:bg-rose-200/[0.09] disabled:cursor-wait disabled:opacity-50"
           >
             {isEnding
               ? "Ending event…"
               : isCaptureActive
                 ? "Finish capture before ending"
+                : isMemoryProcessing
+                  ? "Finish memory refresh before ending"
                 : "End Event"}
           </button>
         </div>
       </div>
+
+      <MemoryCardsView
+        event={event}
+        autoExtract={false}
+        onProcessingChange={setIsMemoryProcessing}
+      />
     </section>
   );
 }

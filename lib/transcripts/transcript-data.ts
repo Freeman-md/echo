@@ -3,12 +3,14 @@ import type { Transcript } from "@/types";
 import type { TranscriptSource } from "@/types/conversation-capture";
 
 interface CreateTranscriptInput {
+  id: string;
   eventId: string;
   rawText: string;
   source: TranscriptSource;
 }
 
 export async function createTranscript({
+  id,
   eventId,
   rawText,
   source,
@@ -21,11 +23,12 @@ export async function createTranscript({
 
   const { data, error } = await getSupabaseClient()
     .from("transcripts")
-    .insert({
+    .upsert({
+      id,
       event_id: eventId,
       raw_text: transcript,
       source,
-    })
+    }, { onConflict: "id" })
     .select("*")
     .single();
 
@@ -34,4 +37,20 @@ export async function createTranscript({
   }
 
   return data as Transcript;
+}
+
+export async function listTranscriptsForEvent(
+  eventId: string,
+): Promise<Transcript[]> {
+  const { data, error } = await getSupabaseClient()
+    .from("transcripts")
+    .select("*")
+    .eq("event_id", eventId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw new Error(`Could not load conversation batches: ${error.message}`);
+  }
+
+  return (data ?? []) as Transcript[];
 }

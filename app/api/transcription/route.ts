@@ -5,6 +5,10 @@ import {
   transcribeAudio,
   TRANSCRIPTION_MODEL,
 } from "@/lib/openai/transcribe-audio";
+import {
+  ApiAuthenticationError,
+  authenticateApiRequest,
+} from "@/lib/supabase/api-auth";
 import type {
   TranscriptionErrorResponse,
   TranscriptionResponse,
@@ -25,6 +29,21 @@ function invalidAudioResponse(
 
 export async function POST(request: Request) {
   let audio: File;
+
+  try {
+    await authenticateApiRequest(request);
+  } catch (error) {
+    return NextResponse.json<TranscriptionErrorResponse>(
+      {
+        error:
+          error instanceof ApiAuthenticationError
+            ? error.message
+            : "Sign in before transcribing audio.",
+        code: "TRANSCRIPTION_FAILED",
+      },
+      { status: 401 },
+    );
+  }
 
   try {
     const formData = await request.formData();

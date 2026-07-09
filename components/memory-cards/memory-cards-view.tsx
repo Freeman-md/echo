@@ -4,12 +4,18 @@ import { useCallback, useEffect, useState } from "react";
 
 import { AiMemoryView } from "@/components/ai-memory-view";
 import { MemoryCardsContent } from "@/components/memory-cards/memory-cards-content";
+import {
+  EventMemoryRequestError,
+  requestMemoryExtraction,
+} from "@/lib/memory/request-memory-extraction";
 import { fetchEventMemories } from "@/lib/memories/memory-data";
 import type { Event } from "@/types";
 import type { EventMemoryData } from "@/types/memory-cards";
 
 interface MemoryCardsViewProps {
   event: Event;
+  autoExtract?: boolean;
+  onProcessingChange?: (isProcessing: boolean) => void;
 }
 
 type MemoryCardsState =
@@ -17,9 +23,15 @@ type MemoryCardsState =
   | { status: "error"; message: string }
   | { status: "ready"; data: EventMemoryData };
 
-export function MemoryCardsView({ event }: MemoryCardsViewProps) {
+export function MemoryCardsView({
+  event,
+  autoExtract = true,
+  onProcessingChange,
+}: MemoryCardsViewProps) {
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<MemoryCardsState>({ status: "loading" });
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -58,6 +70,27 @@ export function MemoryCardsView({ event }: MemoryCardsViewProps) {
         }),
       );
   }, [event.id]);
+
+  async function refreshMemory() {
+    setIsRefreshing(true);
+    onProcessingChange?.(true);
+    setRefreshError(null);
+
+    try {
+      await requestMemoryExtraction(event.id, { forceRefresh: true });
+      const data = await fetchEventMemories(event.id);
+      setState({ status: "ready", data });
+    } catch (error) {
+      setRefreshError(
+        error instanceof EventMemoryRequestError || error instanceof Error
+          ? error.message
+          : "Echo could not refresh this memory.",
+      );
+    } finally {
+      setIsRefreshing(false);
+      onProcessingChange?.(false);
+    }
+  }
 
   function retry() {
     setState({ status: "loading" });
@@ -111,6 +144,39 @@ export function MemoryCardsView({ event }: MemoryCardsViewProps) {
     state.data.people.length > 0 || Boolean(state.data.eventInsight);
 
   if (!hasMemory) {
+    if (!autoExtract) {
+      return (
+        <section className="glass-card mt-7 rounded-[1.75rem] px-6 py-9 text-center">
+          <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-violet-200/10 bg-violet-300/[0.05] text-violet-100">
+            ✦
+          </span>
+          <h2 className="mt-5 text-xl font-semibold text-white">
+            Turn your batches into memory
+          </h2>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+            Generate a living memory from every conversation batch captured so
+            far. Refresh it whenever new moments are added.
+          </p>
+          {refreshError && (
+            <p
+              role="alert"
+              className="mx-auto mt-4 max-w-md text-sm leading-6 text-rose-100/75"
+            >
+              {refreshError}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={() => void refreshMemory()}
+            disabled={isRefreshing}
+            className="button-primary mx-auto mt-6 flex justify-center disabled:cursor-wait disabled:opacity-50"
+          >
+            {isRefreshing ? "Generating memory…" : "Generate memory"}
+          </button>
+        </section>
+      );
+    }
+
     return (
       <div>
         <AiMemoryView
@@ -125,5 +191,13 @@ export function MemoryCardsView({ event }: MemoryCardsViewProps) {
     );
   }
 
-  return <MemoryCardsContent event={event} data={state.data} />;
+  return (
+    <MemoryCardsContent
+      event={event}
+      data={state.data}
+      isRefreshing={isRefreshing}
+      refreshError={refreshError}
+      onRefresh={() => void refreshMemory()}
+    />
+  );
 }

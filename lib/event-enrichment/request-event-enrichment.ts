@@ -2,11 +2,13 @@ import type {
   EnrichEventResponse,
   EventClue,
 } from "@/types/event-lifecycle";
+import { getCurrentAccessToken } from "@/lib/supabase/access-token";
 
 export async function requestEventEnrichment(
   clue: EventClue,
   image?: File,
 ): Promise<EnrichEventResponse> {
+  const accessToken = await getCurrentAccessToken();
   const formData = new FormData();
   formData.set("type", clue.type);
 
@@ -18,6 +20,9 @@ export async function requestEventEnrichment(
 
   const response = await fetch("/api/event-enrichment", {
     method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
     body: formData,
   });
   const payload = (await response.json()) as

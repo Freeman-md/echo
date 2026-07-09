@@ -1,12 +1,13 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import {
   toEventInsightRow,
   toPersonRows,
   personFromRow,
 } from "@/lib/memory/map-memory";
 import { memoryExtractionSchema } from "@/lib/memory/schema";
-import { getServerSupabaseClient } from "@/lib/supabase/server";
 import type { Event, EventInsight, PersonMemory, Transcript } from "@/types";
 import type {
   EventMemoryError,
@@ -14,6 +15,7 @@ import type {
 } from "@/types/memory";
 
 const MAX_TRANSCRIPT_CHARACTERS = 80_000;
+const TRANSCRIPT_SEPARATOR = "\n\n--- Conversation segment ---\n\n";
 
 export class MemoryServiceError extends Error {
   constructor(
@@ -40,10 +42,35 @@ function databaseError(message: string): MemoryServiceError {
   return new MemoryServiceError(message, "database_error", 500);
 }
 
+function combineTranscriptSegments(transcripts: Transcript[]): string {
+  const segments = transcripts
+    .map((item) => item.raw_text.trim())
+    .filter(Boolean);
+  if (segments.length === 0) return "";
+
+  const separatorCharacters =
+    TRANSCRIPT_SEPARATOR.length * Math.max(0, segments.length - 1);
+  const segmentBudget = Math.max(
+    1,
+    Math.floor(
+      (MAX_TRANSCRIPT_CHARACTERS - separatorCharacters) / segments.length,
+    ),
+  );
+
+  return segments
+    .map((segment) =>
+      segment.length > segmentBudget
+        ? `${segment.slice(0, Math.max(1, segmentBudget - 1))}…`
+        : segment,
+    )
+    .join(TRANSCRIPT_SEPARATOR)
+    .slice(0, MAX_TRANSCRIPT_CHARACTERS);
+}
+
 export async function loadMemorySource(
+  supabase: SupabaseClient,
   eventId: string,
 ): Promise<MemorySource> {
-  const supabase = getServerSupabaseClient();
   const [eventResult, transcriptResult] = await Promise.all([
     supabase
       .from("events")
@@ -67,9 +94,12 @@ export async function loadMemorySource(
       404,
     );
   }
-  if (eventResult.data.status !== "completed") {
+  if (
+    eventResult.data.status !== "completed" &&
+    eventResult.data.status !== "active"
+  ) {
     throw new MemoryServiceError(
-      "Finish the event before extracting its memories.",
+      "This event is not ready for memory extraction.",
       "event_not_completed",
       409,
     );
@@ -81,11 +111,7 @@ export async function loadMemorySource(
   }
 
   const transcripts = (transcriptResult.data ?? []) as Transcript[];
-  const transcript = transcripts
-    .map((item) => item.raw_text.trim())
-    .filter(Boolean)
-    .join("\n\n--- Conversation segment ---\n\n")
-    .slice(0, MAX_TRANSCRIPT_CHARACTERS);
+  const transcript = combineTranscriptSegments(transcripts);
 
   if (!transcript) {
     throw new MemoryServiceError(
@@ -102,9 +128,9 @@ export async function loadMemorySource(
 }
 
 export async function loadPersistedEventMemory(
+  supabase: SupabaseClient,
   eventId: string,
 ): Promise<PersistedEventMemory> {
-  const supabase = getServerSupabaseClient();
   const [peopleResult, insightResult] = await Promise.all([
     supabase
       .from("people")
@@ -169,46 +195,29 @@ export function extractionFromPersistedMemory(
 }
 
 export async function persistExtractedMemory(
+  supabase: SupabaseClient,
   eventId: string,
   memory: MemoryExtraction,
-  existingPeople: PersonMemory[] = [],
 ): Promise<PersistedEventMemory> {
-  const supabase = getServerSupabaseClient();
   const insightRow = toEventInsightRow(eventId, memory);
-  const { data: insight, error: insightError } = await supabase
-    .from("event_insights")
-    .insert(insightRow)
-    .select("*")
-    .single();
+  const peopleRows = toPersonRows(eventId, memory);
+  const { error } = await supabase.rpc("replace_event_memory", {
+    p_event_id: eventId,
+    p_people: peopleRows,
+    p_insight: insightRow,
+  });
 
-  if (insightError) {
+  if (error) {
     throw databaseError(
-      `Could not save event insight: ${insightError.message}`,
+      `Could not atomically save event memory: ${error.message}`,
     );
   }
 
-  let people = existingPeople;
-  if (people.length === 0 && memory.people.length > 0) {
-    const { data, error } = await supabase
-      .from("people")
-      .insert(toPersonRows(eventId, memory))
-      .select("*");
-
-    if (error) {
-      throw databaseError(
-        `Event insight was saved, but people memories need retrying: ${error.message}`,
-      );
-    }
-    people = (data ?? []) as PersonMemory[];
-  }
-
-  return {
-    people,
-    eventInsight: insight as EventInsight,
-  };
+  return loadPersistedEventMemory(supabase, eventId);
 }
 
 export async function repairPeopleFromCheckpoint(
+  supabase: SupabaseClient,
   eventId: string,
   memory: MemoryExtraction,
   eventInsight: EventInsight,
@@ -217,18 +226,5 @@ export async function repairPeopleFromCheckpoint(
     return { people: [], eventInsight };
   }
 
-  const supabase = getServerSupabaseClient();
-  const { data, error } = await supabase
-    .from("people")
-    .insert(toPersonRows(eventId, memory))
-    .select("*");
-
-  if (error) {
-    throw databaseError(`Could not restore people memories: ${error.message}`);
-  }
-
-  return {
-    people: (data ?? []) as PersonMemory[],
-    eventInsight,
-  };
+  return persistExtractedMemory(supabase, eventId, memory);
 }

@@ -44,6 +44,7 @@ export interface EventMemoryResponse {
 export interface EventMemoryError {
   error: string;
   code:
+    | "unauthorized"
     | "invalid_request"
     | "event_not_found"
     | "event_not_completed"

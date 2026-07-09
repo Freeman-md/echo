@@ -1,5 +1,6 @@
 export interface Event {
   id: string;
+  user_id: string | null;
   device_session_id: string;
   name: string | null;
   location: string | null;

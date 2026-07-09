@@ -4,6 +4,10 @@ import { buildEnrichedEventDraft } from "@/lib/event-enrichment/build-event-draf
 import { enrichEvent } from "@/lib/event-enrichment/enrich-event";
 import { inferEventDraft, isEventUrl } from "@/lib/events/infer-event-draft";
 import { fetchEventPage } from "@/lib/fetch-page/fetch-event-page";
+import {
+  ApiAuthenticationError,
+  authenticateApiRequest,
+} from "@/lib/supabase/api-auth";
 import type {
   EnrichEventResponse,
   EventClue,
@@ -56,6 +60,20 @@ function parseTextClue(type: EventClueType, value: FormDataEntryValue | null) {
 export async function POST(request: Request) {
   let clue: EventClue;
   let imageDataUrl: string | undefined;
+
+  try {
+    await authenticateApiRequest(request);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof ApiAuthenticationError
+            ? error.message
+            : "Sign in before enriching an event.",
+      },
+      { status: 401 },
+    );
+  }
 
   try {
     const formData = await request.formData();

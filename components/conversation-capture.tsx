@@ -21,7 +21,10 @@ import {
   requestTranscription,
   TranscriptionRequestError,
 } from "@/lib/transcription/request-transcription";
-import { createTranscript } from "@/lib/transcripts/transcript-data";
+import {
+  createTranscript,
+  listTranscriptsForEvent,
+} from "@/lib/transcripts/transcript-data";
 import type { Transcript } from "@/types";
 import type { TranscriptSource } from "@/types/conversation-capture";
 
@@ -59,6 +62,7 @@ interface RetryAudio {
 }
 
 interface RetryTranscript {
+  id: string;
   rawText: string;
   source: TranscriptSource;
 }
@@ -92,6 +96,13 @@ function formatDuration(totalSeconds: number): string {
   ].join(":");
 }
 
+function formatBatchTime(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
 function MicrophoneIcon() {
   return (
     <svg
@@ -119,7 +130,13 @@ function MicrophoneIcon() {
   );
 }
 
-function CaptureProgress({ status }: { status: CaptureStatus }) {
+function CaptureProgress({
+  status,
+  batchNumber,
+}: {
+  status: CaptureStatus;
+  batchNumber: number;
+}) {
   if (
     status !== "uploading" &&
     status !== "transcribing" &&
@@ -134,7 +151,7 @@ function CaptureProgress({ status }: { status: CaptureStatus }) {
 
   return (
     <ol
-      aria-label="Transcript progress"
+      aria-label={`Conversation batch ${batchNumber} progress`}
       className="mt-5 grid grid-cols-3 gap-2"
     >
       {steps.map((step, index) => (
@@ -166,6 +183,7 @@ export function ConversationCapture({
   onCaptureActivityChange,
 }: ConversationCaptureProps) {
   const recorderRef = useRef<AudioRecordingSession | null>(null);
+  const saveInFlightRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<CaptureStatus>("idle");
   const [durationSeconds, setDurationSeconds] = useState(0);
@@ -179,10 +197,44 @@ export function ConversationCapture({
   const [retryAudio, setRetryAudio] = useState<RetryAudio | null>(null);
   const [retryTranscript, setRetryTranscript] =
     useState<RetryTranscript | null>(null);
+  const [savedSegments, setSavedSegments] = useState<Transcript[]>([]);
+  const [segmentsError, setSegmentsError] = useState<string | null>(null);
 
   useEffect(() => {
     return () => recorderRef.current?.cancel();
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    listTranscriptsForEvent(eventId)
+      .then((segments) => {
+        if (!active) return;
+        setSavedSegments((current) => {
+          const byId = new Map(
+            [...segments, ...current].map((segment) => [segment.id, segment]),
+          );
+          return [...byId.values()].sort(
+            (left, right) =>
+              new Date(left.created_at).getTime() -
+              new Date(right.created_at).getTime(),
+          );
+        });
+        setSegmentsError(null);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setSegmentsError(
+          error instanceof Error
+            ? error.message
+            : "Could not load earlier conversation batches.",
+        );
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [eventId]);
 
   function transition(nextStatus: CaptureStatus) {
     setStatus(nextStatus);
@@ -212,23 +264,32 @@ export function ConversationCapture({
   async function saveTranscript(
     rawText: string,
     source: TranscriptSource,
+    transcriptId = crypto.randomUUID(),
   ) {
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
     const transcript = rawText.trim();
     setFailure(null);
     setTranscriptPreview(transcript);
-    setRetryTranscript({ rawText: transcript, source });
+    setRetryTranscript({ id: transcriptId, rawText: transcript, source });
     transition("saving");
 
     try {
       const saved = await createTranscript({
+        id: transcriptId,
         eventId,
         rawText: transcript,
         source,
       });
       setSavedTranscript(saved);
+      setSavedSegments((current) => [
+        ...current.filter((segment) => segment.id !== saved.id),
+        saved,
+      ]);
       setRetryAudio(null);
       setRetryTranscript(null);
       setFailure(null);
+      setSegmentsError(null);
       transition("success");
     } catch (error) {
       showFailure(
@@ -237,6 +298,8 @@ export function ConversationCapture({
           ? error.message
           : "Supabase could not save this transcript. Retry without recording again.",
       );
+    } finally {
+      saveInFlightRef.current = false;
     }
   }
 
@@ -356,7 +419,11 @@ export function ConversationCapture({
 
   function retryLastStep() {
     if (failure?.kind === "supabase" && retryTranscript) {
-      void saveTranscript(retryTranscript.rawText, retryTranscript.source);
+      void saveTranscript(
+        retryTranscript.rawText,
+        retryTranscript.source,
+        retryTranscript.id,
+      );
       return;
     }
 
@@ -367,42 +434,45 @@ export function ConversationCapture({
 
   const isBusy = ACTIVE_CAPTURE_STATES.has(status);
   const isRecording = status === "recording";
+  const batchNumber = savedSegments.length + 1;
   const hasAudioRetry =
     Boolean(retryAudio) &&
     (failure?.kind === "upload" || failure?.kind === "openai");
 
   const statusLabel =
     status === "requesting"
-      ? "Requesting microphone access"
+      ? `Batch ${batchNumber} · Requesting microphone`
       : status === "recording"
-        ? `Recording · ${formatDuration(durationSeconds)}`
+        ? `Batch ${batchNumber} · ${formatDuration(durationSeconds)}`
         : status === "stopping"
-          ? "Preparing your recording"
+          ? `Batch ${batchNumber} · Preparing audio`
           : status === "uploading"
-            ? `Uploading audio · ${uploadProgress}%`
+            ? `Batch ${batchNumber} · Uploading ${uploadProgress}%`
             : status === "transcribing"
-              ? "OpenAI is transcribing"
+              ? `Batch ${batchNumber} · Transcribing`
               : status === "saving"
-                ? "Saving transcript to Supabase"
+                ? `Batch ${batchNumber} · Saving`
                 : status === "success"
-                  ? "Transcript saved"
+                  ? `${savedSegments.length} ${savedSegments.length === 1 ? "batch" : "batches"} saved`
                   : status === "error"
                     ? "Capture needs attention"
-                    : "Ready to capture";
+                    : savedSegments.length > 0
+                      ? `${savedSegments.length} ${savedSegments.length === 1 ? "batch" : "batches"} captured`
+                      : "Ready to capture";
 
   return (
     <div className="rounded-[1.75rem] border border-white/[0.07] bg-black/20 p-4 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-300">
-            Conversation capture
+            Continuous event memory
           </p>
           <h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em] text-white">
-            Stay in the conversation.
+            Echo captures the room in moments.
           </h2>
           <p className="mt-2 max-w-lg text-sm leading-6 text-slate-500">
-            Echo records, transcribes, and saves the conversation so you do not
-            have to take notes.
+            Capture short conversation batches throughout the event. Each one
+            joins the same growing event memory.
           </p>
         </div>
 
@@ -428,7 +498,7 @@ export function ConversationCapture({
         </div>
       </div>
 
-      <CaptureProgress status={status} />
+      <CaptureProgress status={status} batchNumber={batchNumber} />
 
       {status !== "success" && (
         <>
@@ -451,8 +521,8 @@ export function ConversationCapture({
 
             <p className="mt-4 text-sm font-medium text-slate-200">
               {isRecording
-                ? "Recording this conversation"
-                : "Record with this device"}
+                ? `Capturing conversation batch ${batchNumber}`
+                : `Capture conversation batch ${batchNumber}`}
             </p>
             <p className="mt-1 text-xs text-slate-500">
               {isRecording
@@ -479,7 +549,7 @@ export function ConversationCapture({
                 <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
                 {status === "requesting"
                   ? "Opening microphone…"
-                  : "Start Recording"}
+                  : "Capture Conversation Batch"}
               </button>
             )}
           </div>
@@ -605,8 +675,7 @@ export function ConversationCapture({
                 Conversation captured
               </p>
               <p className="mt-1 text-sm leading-6 text-emerald-100/60">
-                This transcript is linked to the current event and saved in
-                Supabase.
+                Batch {savedSegments.length} is saved and linked to this event.
               </p>
             </div>
           </div>
@@ -630,13 +699,58 @@ export function ConversationCapture({
             onClick={resetCapture}
             className="button-primary mt-5 w-full justify-center"
           >
-            Continue
+            Capture another batch
             <span aria-hidden="true">→</span>
           </button>
           <p className="mt-3 text-center text-xs text-slate-600">
-            Continue keeps this event active so you can capture another
-            conversation.
+            Keep the event active and capture moments whenever they matter.
           </p>
+        </div>
+      )}
+
+      {(savedSegments.length > 0 || segmentsError) && (
+        <div className="mt-6 border-t border-white/[0.06] pt-5">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="text-[0.64rem] font-semibold uppercase tracking-[0.16em] text-slate-600">
+                Event transcript
+              </p>
+              <h3 className="mt-1 text-sm font-semibold text-slate-200">
+                {savedSegments.length} conversation{" "}
+                {savedSegments.length === 1 ? "batch" : "batches"} captured
+              </h3>
+            </div>
+            <span className="text-xs text-emerald-300/60">Saved</span>
+          </div>
+
+          {segmentsError && (
+            <p className="mt-3 rounded-xl border border-amber-200/10 bg-amber-200/[0.04] px-3 py-2 text-xs leading-5 text-amber-100/65">
+              {segmentsError}
+            </p>
+          )}
+
+          {savedSegments.length > 0 && (
+            <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
+              {savedSegments.map((segment, index) => (
+                <details
+                  key={segment.id}
+                  className="rounded-xl border border-white/[0.055] bg-white/[0.02] px-3.5 py-3"
+                >
+                  <summary className="cursor-pointer list-none text-xs text-slate-400">
+                    <span className="font-medium text-slate-300">
+                      Batch {index + 1}
+                    </span>
+                    <span className="ml-2 text-slate-600">
+                      {formatBatchTime(segment.created_at)} · {segment.source}
+                    </span>
+                  </summary>
+                  <p className="mt-3 whitespace-pre-wrap border-t border-white/[0.05] pt-3 text-xs leading-6 text-slate-500">
+                    {segment.raw_text}
+                  </p>
+                </details>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

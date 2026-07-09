@@ -12,6 +12,11 @@ import type { EventDraft } from "@/types/event-lifecycle";
 
 type LifecycleStage = "home" | "clue" | "draft" | "active" | "completed";
 
+interface EventLifecycleProps {
+  initialEvent?: Event | null;
+  onEventChange?: (event: Event | null) => void;
+}
+
 function ArrowIcon() {
   return (
     <svg
@@ -44,10 +49,19 @@ function ensureOriginalClue(draft: EventDraft): string {
   return `${draft.context.trim()}\n\n${label}: ${draft.sourceClue}`.trim();
 }
 
-export function EventLifecycle() {
-  const [stage, setStage] = useState<LifecycleStage>("home");
+export function EventLifecycle({
+  initialEvent = null,
+  onEventChange,
+}: EventLifecycleProps) {
+  const [stage, setStage] = useState<LifecycleStage>(() =>
+    initialEvent?.status === "active"
+      ? "active"
+      : initialEvent?.status === "completed"
+        ? "completed"
+        : "home",
+  );
   const [draft, setDraft] = useState<EventDraft | null>(null);
-  const [activeEvent, setActiveEvent] = useState<Event | null>(null);
+  const [activeEvent, setActiveEvent] = useState<Event | null>(initialEvent);
   const [error, setError] = useState<string | null>(null);
   const [isWorking, setIsWorking] = useState(false);
 
@@ -69,6 +83,7 @@ export function EventLifecycle() {
       });
       setDraft(nextDraft);
       setActiveEvent(createdEvent);
+      onEventChange?.(createdEvent);
       setStage("active");
     } catch (caughtError) {
       setError(
@@ -90,6 +105,7 @@ export function EventLifecycle() {
     try {
       const completedEvent = await completeEvent(activeEvent.id);
       setActiveEvent(completedEvent);
+      onEventChange?.(completedEvent);
       setStage("completed");
     } catch (caughtError) {
       setError(
@@ -108,6 +124,7 @@ export function EventLifecycle() {
     setActiveEvent(null);
     setError(null);
     setIsWorking(false);
+    onEventChange?.(null);
   }
 
   if (stage === "clue") {
