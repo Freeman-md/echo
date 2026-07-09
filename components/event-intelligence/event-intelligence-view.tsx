@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { EventIntelligenceLoading } from "@/components/event-intelligence/event-intelligence-loading";
@@ -101,9 +102,9 @@ export function EventIntelligenceView({
             >
               Try again
             </button>
-            <a href="/" className="button-secondary justify-center">
+            <Link href="/" className="button-secondary justify-center">
               Return to Echo
-            </a>
+            </Link>
           </div>
         </section>
       </main>

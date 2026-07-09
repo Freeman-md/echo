@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import {
   IntelligenceEmptyState,
   IntelligenceSection,
@@ -73,13 +75,13 @@ export function EventIntelligenceReport({
 
       <div className="relative mx-auto w-full max-w-5xl px-5 pb-16 pt-6 sm:px-8 sm:pt-8">
         <nav className="flex items-center justify-between">
-          <a
+          <Link
             href="/"
             className="flex items-center gap-2 text-sm text-slate-500 transition hover:text-slate-200"
           >
             <span aria-hidden="true">←</span>
             Echo
-          </a>
+          </Link>
           <span className="rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 text-[0.66rem] font-medium uppercase tracking-[0.16em] text-slate-500">
             {sourceLabel}
           </span>
