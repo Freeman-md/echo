@@ -1,5 +1,6 @@
 import "server-only";
 
+import { memoryExtractionSchema } from "@/lib/memory/schema";
 import type { Event, EventInsight, PersonMemory, Transcript } from "@/types";
 
 export const EVENT_INTELLIGENCE_SYSTEM_PROMPT = `
@@ -100,6 +101,9 @@ export function buildEventIntelligencePrompt({
   eventInsight,
   transcripts,
 }: EventIntelligencePromptInput): string {
+  const memoryCheckpoint = eventInsight
+    ? memoryExtractionSchema.safeParse(eventInsight.raw_json)
+    : null;
   const evidence = {
     event: {
       id: event.id,
@@ -130,7 +134,15 @@ export function buildEventIntelligencePrompt({
         "collaboration_opportunities",
       ),
     })),
-    prior_event_insight: eventInsight
+    prior_event_insight: memoryCheckpoint?.success
+      ? {
+          summary: memoryCheckpoint.data.event_insight.event_summary,
+          topics: memoryCheckpoint.data.event_insight.topics,
+          patterns: memoryCheckpoint.data.event_insight.patterns,
+          recommended_actions:
+            memoryCheckpoint.data.event_insight.recommended_actions,
+        }
+      : eventInsight
       ? {
           summary: eventInsight.summary ?? "",
           topics: eventInsight.key_topics ?? [],

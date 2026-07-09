@@ -32,7 +32,7 @@ export function IntelligenceSection({
         {title}
       </h2>
       {description && (
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400/80">
           {description}
         </p>
       )}
@@ -43,7 +43,7 @@ export function IntelligenceSection({
 
 export function IntelligenceEmptyState({ children }: { children: ReactNode }) {
   return (
-    <p className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-center text-sm leading-6 text-slate-500">
+    <p className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-center text-sm leading-6 text-slate-400/80">
       {children}
     </p>
   );

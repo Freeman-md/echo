@@ -28,7 +28,12 @@ const requestSchema = z.object({
   regenerate: z.boolean().optional().default(false),
 });
 
-const activeReports = new Map<string, Promise<EventIntelligenceResponse>>();
+interface ActiveReportJob {
+  regenerate: boolean;
+  promise: Promise<EventIntelligenceResponse>;
+}
+
+const activeReports = new Map<string, ActiveReportJob>();
 
 function storedResponse(
   stored: StoredReportMatch,
@@ -149,6 +154,33 @@ async function processEventIntelligence(
   }
 }
 
+function scheduleEventIntelligence(
+  eventId: string,
+  regenerate: boolean,
+): Promise<EventIntelligenceResponse> {
+  const current = activeReports.get(eventId);
+
+  if (current && (!regenerate || current.regenerate)) {
+    return current.promise;
+  }
+
+  const promise = current
+    ? current.promise
+        .catch(() => undefined)
+        .then(() => processEventIntelligence(eventId, true))
+    : processEventIntelligence(eventId, regenerate);
+
+  activeReports.set(eventId, { regenerate, promise });
+  const clearJob = () => {
+    if (activeReports.get(eventId)?.promise === promise) {
+      activeReports.delete(eventId);
+    }
+  };
+  void promise.then(clearJob, clearJob);
+
+  return promise;
+}
+
 export async function POST(request: Request) {
   let eventId: string;
   let regenerate: boolean;
@@ -167,11 +199,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const jobKey = eventId;
-  const existingJob = activeReports.get(jobKey);
-  const job =
-    existingJob ?? processEventIntelligence(eventId, regenerate);
-  if (!existingJob) activeReports.set(jobKey, job);
+  const job = scheduleEventIntelligence(eventId, regenerate);
 
   try {
     return NextResponse.json<EventIntelligenceResponse>(await job);
@@ -193,7 +221,5 @@ export async function POST(request: Request) {
       },
       { status: serviceError.status },
     );
-  } finally {
-    if (!existingJob) activeReports.delete(jobKey);
   }
 }

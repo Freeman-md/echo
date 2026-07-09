@@ -77,12 +77,12 @@ export function EventIntelligenceReport({
         <nav className="flex items-center justify-between">
           <Link
             href="/"
-            className="flex items-center gap-2 text-sm text-slate-500 transition hover:text-slate-200"
+            className="flex items-center gap-2 text-sm text-slate-400/80 transition hover:text-slate-200"
           >
             <span aria-hidden="true">←</span>
             Echo
           </Link>
-          <span className="rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 text-[0.66rem] font-medium uppercase tracking-[0.16em] text-slate-500">
+          <span className="rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 text-[0.66rem] font-medium uppercase tracking-[0.16em] text-slate-400/80">
             {sourceLabel}
           </span>
         </nav>
@@ -95,7 +95,7 @@ export function EventIntelligenceReport({
           <h1 className="mx-auto mt-5 max-w-4xl text-4xl font-semibold tracking-[-0.06em] text-balance text-white sm:text-7xl">
             {overview.event_name}
           </h1>
-          <p className="mt-4 text-sm text-slate-500">
+          <p className="mt-4 text-sm text-slate-400/80">
             {overview.event_location || "Location not recorded"}
           </p>
 
@@ -175,7 +175,7 @@ export function EventIntelligenceReport({
                           <h3 className="text-sm font-semibold text-slate-200">
                             {item.pattern}
                           </h3>
-                          <p className="mt-1 text-sm leading-6 text-slate-500">
+                          <p className="mt-1 text-sm leading-6 text-slate-400/80">
                             {item.evidence}
                           </p>
                         </div>
@@ -309,7 +309,7 @@ export function EventIntelligenceReport({
                       <p className="mt-2 text-sm font-medium leading-6 text-slate-200">
                         {item.action}
                       </p>
-                      <p className="mt-1 text-sm leading-6 text-slate-500">
+                      <p className="mt-1 text-sm leading-6 text-slate-400/80">
                         {item.reason}
                       </p>
                     </div>
@@ -344,7 +344,7 @@ export function EventIntelligenceReport({
                     <h3 className="mt-1.5 text-base font-semibold text-slate-200">
                       {item.title}
                     </h3>
-                    <p className="mt-1 text-sm leading-6 text-slate-500">
+                    <p className="mt-1 text-sm leading-6 text-slate-400/80">
                       {item.summary}
                     </p>
                   </li>

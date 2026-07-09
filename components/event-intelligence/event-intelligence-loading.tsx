@@ -43,7 +43,7 @@ export function EventIntelligenceLoading() {
           <h1 className="mt-3 text-3xl font-semibold tracking-[-0.045em] text-white sm:text-5xl">
             Echo is reading the room.
           </h1>
-          <p className="mx-auto mt-4 max-w-lg text-sm leading-6 text-slate-500">
+          <p className="mx-auto mt-4 max-w-lg text-sm leading-6 text-slate-400/80">
             Turning individual memories into an event-wide view of what
             mattered and what to do next.
           </p>
@@ -56,7 +56,7 @@ export function EventIntelligenceLoading() {
                 className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition ${
                   index <= activeStep
                     ? "border-violet-300/10 bg-violet-300/[0.035] text-slate-300"
-                    : "border-white/[0.06] bg-black/20 text-slate-500"
+                    : "border-white/[0.06] bg-black/20 text-slate-400/80"
                 }`}
               >
                 <span

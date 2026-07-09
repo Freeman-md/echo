@@ -112,7 +112,7 @@ export const eventIntelligenceReportSchema = z.object({
 export const storedEventIntelligenceSchema = z.object({
   schema_version: z.literal(1),
   generated_at: z.string(),
-  source_fingerprint: z.string(),
+  source_fingerprint: z.string().optional(),
   report: eventIntelligenceReportSchema,
 });
 

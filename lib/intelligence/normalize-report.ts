@@ -2,6 +2,7 @@ import {
   eventIntelligenceReportSchema,
   type EventIntelligenceReport,
 } from "@/lib/intelligence/schema";
+import { memoryExtractionSchema } from "@/lib/memory/schema";
 import type { EventInsight, PersonMemory, Transcript } from "@/types";
 
 interface NormalizeEventIntelligenceInput {
@@ -27,6 +28,26 @@ function uniqueLabels(values: string[]): string[] {
   }
 
   return [...labels.values()];
+}
+
+function collectStringValues(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(collectStringValues);
+  if (value && typeof value === "object") {
+    return Object.values(value).flatMap(collectStringValues);
+  }
+  return [];
+}
+
+function hasGroundedLabel(label: string, evidence: string): boolean {
+  const key = normalizationKey(label);
+  if (!key) return false;
+
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(
+    `(^|[^\\p{L}\\p{N}])${escaped}($|[^\\p{L}\\p{N}])`,
+    "u",
+  ).test(evidence);
 }
 
 function displayTime(isoTimestamp: string): string {
@@ -56,24 +77,32 @@ export function normalizeEventIntelligenceReport({
     transcripts.map((transcript) => [transcript.id, transcript]),
   );
 
-  const evidenceCorpus = normalizationKey(
-    JSON.stringify({
-      people,
-      transcripts: transcripts.map((transcript) => transcript.raw_text),
-      event_insight: eventInsight
-        ? {
-            summary: eventInsight.summary,
-            key_topics: eventInsight.key_topics,
-            patterns: eventInsight.patterns,
-            recommended_next_actions:
-              eventInsight.recommended_next_actions,
-          }
-        : null,
-    }),
-  );
+  const checkpoint = eventInsight
+    ? memoryExtractionSchema.safeParse(eventInsight.raw_json)
+    : null;
+  const evidenceValues = [
+    ...people.flatMap((person) =>
+      collectStringValues({
+        name: person.name,
+        role: person.inferred_role,
+        company: person.company,
+        summary: person.summary,
+        topics: person.topics,
+        interests: person.interests,
+        memorable_details: person.memorable_details,
+        suggested_follow_up: person.suggested_follow_up,
+        memory: person.raw_json,
+      }),
+    ),
+    ...transcripts.map((transcript) => transcript.raw_text),
+    ...(checkpoint?.success
+      ? collectStringValues(checkpoint.data.event_insight)
+      : []),
+  ];
+  const evidenceCorpus = normalizationKey(evidenceValues.join("\n"));
   const groundedLabels = (values: string[]) =>
     uniqueLabels(values)
-      .filter((value) => evidenceCorpus.includes(normalizationKey(value)))
+      .filter((value) => hasGroundedLabel(value, evidenceCorpus))
       .slice(0, 24);
 
   const topics = groundedLabels(report.topics);

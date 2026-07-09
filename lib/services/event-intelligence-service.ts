@@ -147,11 +147,10 @@ export function assertIntelligenceEvidence(source: EventIntelligenceSource) {
 
     if (
       checkpoint.success &&
-      checkpoint.data.people.length > 0 &&
-      source.people.length === 0
+      source.people.length < checkpoint.data.people.length
     ) {
       throw new EventIntelligenceServiceError(
-        "Remembered people are still being saved. Retry memory extraction, then try again.",
+        "Some remembered people are still being saved. Retry memory extraction, then try again.",
         "missing_data",
         409,
       );
