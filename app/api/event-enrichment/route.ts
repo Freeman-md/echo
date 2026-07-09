@@ -148,7 +148,10 @@ export async function POST(request: Request) {
       warning,
     });
   } catch (error) {
-    console.error("Event enrichment failed:", error);
+    console.warn(
+      "Event enrichment unavailable:",
+      error instanceof Error ? error.message : "Unknown enrichment error",
+    );
     return fallbackResponse(
       clue,
       "AI enrichment is temporarily unavailable, so Echo created a quick draft from your original clue.",

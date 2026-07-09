@@ -57,6 +57,10 @@ async function assertPublicHttpUrl(value: string): Promise<URL> {
     throw new Error("Only public HTTP event pages can be fetched.");
   }
 
+  if (url.username || url.password) {
+    throw new Error("Event URLs containing credentials cannot be fetched.");
+  }
+
   const hostname = url.hostname.toLowerCase();
   if (
     hostname === "localhost" ||
