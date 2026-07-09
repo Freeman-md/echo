@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z, ZodError } from "zod";
 
 import { extractMemory } from "@/lib/memory/extract-memory";
@@ -10,6 +11,7 @@ import {
   persistExtractedMemory,
   repairPeopleFromCheckpoint,
 } from "@/lib/services/memory-service";
+import { getServerSupabaseClient } from "@/lib/supabase/server";
 import type {
   EventMemoryError,
   EventMemoryResponse,
@@ -20,20 +22,24 @@ export const maxDuration = 60;
 
 const requestSchema = z.object({
   eventId: z.string().uuid(),
+  forceRefresh: z.boolean().optional().default(false),
 });
 
 const activeExtractions = new Map<string, Promise<EventMemoryResponse>>();
 
 async function processEventMemory(
+  supabase: SupabaseClient,
   eventId: string,
+  forceRefresh: boolean,
 ): Promise<EventMemoryResponse> {
-  const persisted = await loadPersistedEventMemory(eventId);
+  const persisted = await loadPersistedEventMemory(supabase, eventId);
   const existingExtraction = extractionFromPersistedMemory(persisted);
 
-  if (existingExtraction && persisted.eventInsight) {
+  if (!forceRefresh && existingExtraction && persisted.eventInsight) {
     const repaired =
       persisted.people.length === 0
         ? await repairPeopleFromCheckpoint(
+            supabase,
             eventId,
             existingExtraction,
             persisted.eventInsight,
@@ -48,7 +54,7 @@ async function processEventMemory(
     };
   }
 
-  const source = await loadMemorySource(eventId);
+  const source = await loadMemorySource(supabase, eventId);
   let memory;
 
   try {
@@ -79,9 +85,11 @@ async function processEventMemory(
   }
 
   const saved = await persistExtractedMemory(
+    supabase,
     eventId,
     memory,
     persisted.people,
+    forceRefresh,
   );
 
   if (!saved.eventInsight) {
@@ -102,10 +110,43 @@ async function processEventMemory(
 
 export async function POST(request: Request) {
   let eventId: string;
+  let forceRefresh: boolean;
+
+  const authorization = request.headers.get("authorization");
+  const accessToken = authorization?.startsWith("Bearer ")
+    ? authorization.slice(7)
+    : null;
+
+  if (!accessToken) {
+    return NextResponse.json<EventMemoryError>(
+      {
+        error: "Sign in before generating event memories.",
+        code: "unauthorized",
+      },
+      { status: 401 },
+    );
+  }
+
+  const supabase = getServerSupabaseClient(accessToken);
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser(accessToken);
+
+  if (authError || !user) {
+    return NextResponse.json<EventMemoryError>(
+      {
+        error: "Your session has expired. Sign in again.",
+        code: "unauthorized",
+      },
+      { status: 401 },
+    );
+  }
 
   try {
     const body = requestSchema.parse(await request.json());
     eventId = body.eventId;
+    forceRefresh = body.forceRefresh;
   } catch {
     return NextResponse.json<EventMemoryError>(
       {
@@ -117,9 +158,11 @@ export async function POST(request: Request) {
   }
 
   // Coalesce duplicate requests from React Strict Mode or quick repeated taps.
-  const existingJob = activeExtractions.get(eventId);
-  const job = existingJob ?? processEventMemory(eventId);
-  if (!existingJob) activeExtractions.set(eventId, job);
+  const jobKey = `${user.id}:${eventId}:${forceRefresh ? "refresh" : "load"}`;
+  const existingJob = activeExtractions.get(jobKey);
+  const job =
+    existingJob ?? processEventMemory(supabase, eventId, forceRefresh);
+  if (!existingJob) activeExtractions.set(jobKey, job);
 
   try {
     return NextResponse.json<EventMemoryResponse>(await job);
@@ -142,6 +185,6 @@ export async function POST(request: Request) {
       { status: serviceError.status },
     );
   } finally {
-    if (!existingJob) activeExtractions.delete(eventId);
+    if (!existingJob) activeExtractions.delete(jobKey);
   }
 }

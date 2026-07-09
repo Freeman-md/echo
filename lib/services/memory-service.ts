@@ -1,12 +1,13 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import {
   toEventInsightRow,
   toPersonRows,
   personFromRow,
 } from "@/lib/memory/map-memory";
 import { memoryExtractionSchema } from "@/lib/memory/schema";
-import { getServerSupabaseClient } from "@/lib/supabase/server";
 import type { Event, EventInsight, PersonMemory, Transcript } from "@/types";
 import type {
   EventMemoryError,
@@ -41,9 +42,9 @@ function databaseError(message: string): MemoryServiceError {
 }
 
 export async function loadMemorySource(
+  supabase: SupabaseClient,
   eventId: string,
 ): Promise<MemorySource> {
-  const supabase = getServerSupabaseClient();
   const [eventResult, transcriptResult] = await Promise.all([
     supabase
       .from("events")
@@ -67,9 +68,12 @@ export async function loadMemorySource(
       404,
     );
   }
-  if (eventResult.data.status !== "completed") {
+  if (
+    eventResult.data.status !== "completed" &&
+    eventResult.data.status !== "active"
+  ) {
     throw new MemoryServiceError(
-      "Finish the event before extracting its memories.",
+      "This event is not ready for memory extraction.",
       "event_not_completed",
       409,
     );
@@ -102,9 +106,9 @@ export async function loadMemorySource(
 }
 
 export async function loadPersistedEventMemory(
+  supabase: SupabaseClient,
   eventId: string,
 ): Promise<PersistedEventMemory> {
-  const supabase = getServerSupabaseClient();
   const [peopleResult, insightResult] = await Promise.all([
     supabase
       .from("people")
@@ -169,11 +173,30 @@ export function extractionFromPersistedMemory(
 }
 
 export async function persistExtractedMemory(
+  supabase: SupabaseClient,
   eventId: string,
   memory: MemoryExtraction,
   existingPeople: PersonMemory[] = [],
+  replaceExisting = false,
 ): Promise<PersistedEventMemory> {
-  const supabase = getServerSupabaseClient();
+  if (replaceExisting) {
+    const [peopleDelete, insightDelete] = await Promise.all([
+      supabase.from("people").delete().eq("event_id", eventId),
+      supabase.from("event_insights").delete().eq("event_id", eventId),
+    ]);
+
+    if (peopleDelete.error || insightDelete.error) {
+      throw databaseError(
+        `Could not replace existing memory: ${
+          peopleDelete.error?.message ??
+          insightDelete.error?.message ??
+          "Unknown database error"
+        }`,
+      );
+    }
+    existingPeople = [];
+  }
+
   const insightRow = toEventInsightRow(eventId, memory);
   const { data: insight, error: insightError } = await supabase
     .from("event_insights")
@@ -209,6 +232,7 @@ export async function persistExtractedMemory(
 }
 
 export async function repairPeopleFromCheckpoint(
+  supabase: SupabaseClient,
   eventId: string,
   memory: MemoryExtraction,
   eventInsight: EventInsight,
@@ -217,7 +241,6 @@ export async function repairPeopleFromCheckpoint(
     return { people: [], eventInsight };
   }
 
-  const supabase = getServerSupabaseClient();
   const { data, error } = await supabase
     .from("people")
     .insert(toPersonRows(eventId, memory))

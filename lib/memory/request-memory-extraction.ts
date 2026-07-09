@@ -2,6 +2,7 @@ import type {
   EventMemoryError,
   EventMemoryResponse,
 } from "@/types/memory";
+import { getSupabaseClient } from "@/lib/supabase/client";
 
 const inFlightRequests = new Map<string, Promise<EventMemoryResponse>>();
 
@@ -15,13 +16,35 @@ export class EventMemoryRequestError extends Error {
   }
 }
 
-async function makeRequest(eventId: string): Promise<EventMemoryResponse> {
+interface MemoryExtractionOptions {
+  forceRefresh?: boolean;
+}
+
+async function makeRequest(
+  eventId: string,
+  options: MemoryExtractionOptions,
+): Promise<EventMemoryResponse> {
+  const {
+    data: { session },
+  } = await getSupabaseClient().auth.getSession();
+
+  if (!session?.access_token) {
+    throw new EventMemoryRequestError(
+      "Sign in before generating event memories.",
+      "unauthorized",
+    );
+  }
+
   const response = await fetch("/api/memory-extraction", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
     },
-    body: JSON.stringify({ eventId }),
+    body: JSON.stringify({
+      eventId,
+      forceRefresh: options.forceRefresh ?? false,
+    }),
   });
   const payload = (await response.json()) as
     | EventMemoryResponse
@@ -39,13 +62,15 @@ async function makeRequest(eventId: string): Promise<EventMemoryResponse> {
 
 export function requestMemoryExtraction(
   eventId: string,
+  options: MemoryExtractionOptions = {},
 ): Promise<EventMemoryResponse> {
-  const existing = inFlightRequests.get(eventId);
+  const requestKey = `${eventId}:${options.forceRefresh ? "refresh" : "load"}`;
+  const existing = inFlightRequests.get(requestKey);
   if (existing) return existing;
 
-  const request = makeRequest(eventId).finally(() => {
-    inFlightRequests.delete(eventId);
+  const request = makeRequest(eventId, options).finally(() => {
+    inFlightRequests.delete(requestKey);
   });
-  inFlightRequests.set(eventId, request);
+  inFlightRequests.set(requestKey, request);
   return request;
 }

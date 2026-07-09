@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { ConversationCapture } from "@/components/conversation-capture";
+import { MemoryCardsView } from "@/components/memory-cards/memory-cards-view";
 import type { Event } from "@/types";
 
 interface ActiveEventViewProps {
@@ -86,6 +87,8 @@ export function ActiveEventView({
           </button>
         </div>
       </div>
+
+      <MemoryCardsView event={event} autoExtract={false} />
     </section>
   );
 }

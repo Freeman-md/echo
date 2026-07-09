@@ -13,11 +13,17 @@ const priorityRank: Record<string, number> = {
 interface MemoryCardsContentProps {
   event: Event;
   data: EventMemoryData;
+  isRefreshing?: boolean;
+  refreshError?: string | null;
+  onRefresh?: () => void;
 }
 
 export function MemoryCardsContent({
   event,
   data,
+  isRefreshing = false,
+  refreshError = null,
+  onRefresh,
 }: MemoryCardsContentProps) {
   const { people, eventInsight } = data;
   const sortedPeople = [...people].sort((left, right) => {
@@ -54,10 +60,31 @@ export function MemoryCardsContent({
             Your memory of the room
           </h2>
         </div>
-        <span className="rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 text-[0.66rem] text-slate-500">
-          {data.isDemo ? "Demo memory" : "Saved to Echo"}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 text-[0.66rem] text-slate-500">
+            {data.isDemo ? "Demo memory" : "Saved to Echo"}
+          </span>
+          {onRefresh && !data.isDemo && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className="rounded-full border border-violet-200/10 bg-violet-300/[0.05] px-3 py-1.5 text-[0.68rem] font-medium text-violet-100/75 transition hover:bg-violet-300/[0.09] disabled:cursor-wait disabled:opacity-50"
+            >
+              {isRefreshing ? "Refreshing…" : "Refresh memory"}
+            </button>
+          )}
+        </div>
       </div>
+
+      {refreshError && (
+        <p
+          role="alert"
+          className="mb-5 rounded-2xl border border-rose-300/10 bg-rose-300/[0.045] px-4 py-3 text-xs leading-5 text-rose-100/75"
+        >
+          {refreshError}
+        </p>
+      )}
 
       {data.isDemo && (
         <div className="mb-5 rounded-2xl border border-amber-200/10 bg-amber-200/[0.04] px-4 py-3 text-xs leading-5 text-amber-100/65">
