@@ -59,6 +59,11 @@ alter table public.transcripts enable row level security;
 alter table public.people enable row level security;
 alter table public.event_insights enable row level security;
 
+grant select, insert, update on public.events to anon;
+grant select, insert, update on public.transcripts to anon;
+grant select, insert, update on public.people to anon;
+grant select, insert, update on public.event_insights to anon;
+
 -- Milestone 0 demo policies. With no authentication or durable device identity
 -- yet, ownership cannot be enforced securely. These policies intentionally
 -- allow the anon role to read, insert, and update demo data, but not delete it.

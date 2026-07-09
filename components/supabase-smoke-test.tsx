@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import { getDeviceSessionId } from "@/lib/session/device-session";
 import {
@@ -42,10 +42,6 @@ export function SupabaseSmokeTest() {
 
     setIsLoading(false);
   }, []);
-
-  useEffect(() => {
-    void loadEvents();
-  }, [loadEvents]);
 
   async function createTestEvent() {
     setIsCreating(true);
