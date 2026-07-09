@@ -3,7 +3,7 @@ import "server-only";
 import { zodTextFormat } from "openai/helpers/zod";
 
 import {
-  eventIntelligenceReportSchema,
+  eventIntelligenceOutputSchema,
   type EventIntelligenceReport,
 } from "@/lib/intelligence/schema";
 import { getOpenAIClient } from "@/lib/openai/client";
@@ -40,7 +40,7 @@ export async function generateEventIntelligence(
       input: buildEventIntelligencePrompt(input),
       text: {
         format: zodTextFormat(
-          eventIntelligenceReportSchema,
+          eventIntelligenceOutputSchema,
           "event_intelligence",
         ),
       },
@@ -60,5 +60,5 @@ export async function generateEventIntelligence(
     throw new Error("OpenAI returned no structured Event Intelligence report.");
   }
 
-  return eventIntelligenceReportSchema.parse(response.output_parsed);
+  return eventIntelligenceOutputSchema.parse(response.output_parsed);
 }

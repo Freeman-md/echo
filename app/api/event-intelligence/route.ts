@@ -7,10 +7,12 @@ import type { EventIntelligenceReport } from "@/lib/intelligence/schema";
 import {
   assertIntelligenceEvidence,
   buildEventIntelligenceOverview,
+  buildSourceFingerprint,
   EventIntelligenceServiceError,
   findStoredEventIntelligence,
   loadEventIntelligenceSource,
   persistEventIntelligence,
+  type EventIntelligenceSource,
   type StoredReportMatch,
 } from "@/lib/services/event-intelligence-service";
 import type {
@@ -30,13 +32,19 @@ const activeReports = new Map<string, Promise<EventIntelligenceResponse>>();
 
 function storedResponse(
   stored: StoredReportMatch,
+  intelligenceSource: EventIntelligenceSource,
   overview: EventIntelligenceResponse["overview"],
   source: "stored" | "fallback",
   warning?: string,
 ): EventIntelligenceResponse {
   return {
     overview,
-    report: stored.intelligence.report,
+    report: normalizeEventIntelligenceReport({
+      report: stored.intelligence.report,
+      people: intelligenceSource.people,
+      transcripts: intelligenceSource.transcripts,
+      eventInsight: intelligenceSource.memoryInsight,
+    }),
     generated_at: stored.intelligence.generated_at,
     source,
     warning,
@@ -50,9 +58,14 @@ async function processEventIntelligence(
   const source = await loadEventIntelligenceSource(eventId);
   const overview = buildEventIntelligenceOverview(source);
   const stored = findStoredEventIntelligence(source.insights);
+  const sourceFingerprint = buildSourceFingerprint(source);
 
-  if (stored && !regenerate) {
-    return storedResponse(stored, overview, "stored");
+  if (
+    stored &&
+    !regenerate &&
+    stored.intelligence.source_fingerprint === sourceFingerprint
+  ) {
+    return storedResponse(stored, source, overview, "stored");
   }
 
   try {
@@ -61,6 +74,7 @@ async function processEventIntelligence(
     if (stored) {
       return storedResponse(
         stored,
+        source,
         overview,
         "fallback",
         "Echo kept the previously saved report because event memory is not ready to reanalyse.",
@@ -81,11 +95,13 @@ async function processEventIntelligence(
       report,
       people: source.people,
       transcripts: source.transcripts,
+      eventInsight: source.memoryInsight,
     });
   } catch (error) {
     if (stored) {
       return storedResponse(
         stored,
+        source,
         overview,
         "fallback",
         "OpenAI is temporarily unavailable, so Echo loaded the previously saved report.",
@@ -123,6 +139,7 @@ async function processEventIntelligence(
     if (stored) {
       return storedResponse(
         stored,
+        source,
         overview,
         "fallback",
         "Supabase could not save the refreshed analysis, so Echo kept the previously saved report.",
@@ -150,7 +167,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const jobKey = `${eventId}:${regenerate ? "refresh" : "default"}`;
+  const jobKey = eventId;
   const existingJob = activeReports.get(jobKey);
   const job =
     existingJob ?? processEventIntelligence(eventId, regenerate);

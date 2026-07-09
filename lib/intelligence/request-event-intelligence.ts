@@ -1,3 +1,4 @@
+import { eventIntelligenceResponseSchema } from "@/lib/intelligence/response-schema";
 import type {
   EventIntelligenceError,
   EventIntelligenceErrorCode,
@@ -25,21 +26,6 @@ function isErrorResponse(value: unknown): value is EventIntelligenceError {
   return typeof candidate.error === "string";
 }
 
-function isSuccessResponse(
-  value: unknown,
-): value is EventIntelligenceResponse {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Partial<EventIntelligenceResponse>;
-  return (
-    Boolean(candidate.overview) &&
-    Boolean(candidate.report) &&
-    typeof candidate.generated_at === "string" &&
-    (candidate.source === "generated" ||
-      candidate.source === "stored" ||
-      candidate.source === "fallback")
-  );
-}
-
 async function makeRequest(
   eventId: string,
   regenerate: boolean,
@@ -53,8 +39,9 @@ async function makeRequest(
   });
 
   const payload = (await response.json()) as unknown;
+  const parsedResponse = eventIntelligenceResponseSchema.safeParse(payload);
 
-  if (!response.ok || !isSuccessResponse(payload)) {
+  if (!response.ok || !parsedResponse.success) {
     const error = isErrorResponse(payload) ? payload : null;
     throw new EventIntelligenceRequestError(
       error?.error ?? "Echo could not prepare Event Intelligence.",
@@ -62,7 +49,7 @@ async function makeRequest(
     );
   }
 
-  return payload;
+  return parsedResponse.data;
 }
 
 export function requestEventIntelligence(

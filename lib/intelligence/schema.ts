@@ -10,6 +10,16 @@ const intelligenceMetricsSchema = z.object({
   high_priority_people: z.number().int().nonnegative(),
 });
 
+const intelligenceMetricsOutputSchema = z.object({
+  conversations: z.number(),
+  people_remembered: z.number(),
+  topics_discussed: z.number(),
+  companies_mentioned: z.number(),
+  technologies_mentioned: z.number(),
+  recommended_follow_ups: z.number(),
+  high_priority_people: z.number(),
+});
+
 const roomPatternSchema = z.object({
   pattern: z.string().describe("A concise recurring event-level pattern."),
   evidence: z
@@ -65,6 +75,25 @@ const timelineItemSchema = z.object({
     .describe("Only supplied person IDs relevant to this moment."),
 });
 
+const timelineItemOutputSchema = timelineItemSchema.extend({
+  sequence: z.number(),
+});
+
+export const eventIntelligenceOutputSchema = z.object({
+  summary: z
+    .string()
+    .describe("A concise executive summary of the event as a whole."),
+  patterns: z.array(roomPatternSchema),
+  metrics: intelligenceMetricsOutputSchema,
+  priority_people: z.array(priorityPersonSchema),
+  follow_up_queue: z.array(followUpItemSchema),
+  timeline: z.array(timelineItemOutputSchema),
+  topics: z.array(z.string()),
+  companies: z.array(z.string()),
+  technologies: z.array(z.string()),
+  overall_confidence: z.number(),
+});
+
 export const eventIntelligenceReportSchema = z.object({
   summary: z
     .string()
@@ -83,6 +112,7 @@ export const eventIntelligenceReportSchema = z.object({
 export const storedEventIntelligenceSchema = z.object({
   schema_version: z.literal(1),
   generated_at: z.string(),
+  source_fingerprint: z.string(),
   report: eventIntelligenceReportSchema,
 });
 

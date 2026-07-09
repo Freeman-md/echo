@@ -2,12 +2,17 @@ import {
   eventIntelligenceReportSchema,
   type EventIntelligenceReport,
 } from "@/lib/intelligence/schema";
-import type { PersonMemory, Transcript } from "@/types";
+import type { EventInsight, PersonMemory, Transcript } from "@/types";
 
 interface NormalizeEventIntelligenceInput {
   report: EventIntelligenceReport;
   people: PersonMemory[];
   transcripts: Transcript[];
+  eventInsight: EventInsight | null;
+}
+
+function normalizationKey(value: string): string {
+  return value.normalize("NFKC").trim().toLocaleLowerCase("en-US");
 }
 
 function uniqueLabels(values: string[]): string[] {
@@ -15,8 +20,9 @@ function uniqueLabels(values: string[]): string[] {
 
   for (const value of values) {
     const label = value.trim();
-    if (label && !labels.has(label.toLocaleLowerCase())) {
-      labels.set(label.toLocaleLowerCase(), label);
+    const key = normalizationKey(label);
+    if (key && !labels.has(key)) {
+      labels.set(key, label);
     }
   }
 
@@ -27,18 +33,20 @@ function displayTime(isoTimestamp: string): string {
   const timestamp = new Date(isoTimestamp);
   if (Number.isNaN(timestamp.getTime())) return "Order estimated";
 
-  return new Intl.DateTimeFormat("en-GB", {
+  const time = new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
     timeZone: "UTC",
   }).format(timestamp);
+  return `${time} UTC`;
 }
 
 export function normalizeEventIntelligenceReport({
   report,
   people,
   transcripts,
+  eventInsight,
 }: NormalizeEventIntelligenceInput): EventIntelligenceReport {
   const peopleById = new Map(people.map((person) => [person.id, person]));
   const transcriptOrder = new Map(
@@ -48,9 +56,29 @@ export function normalizeEventIntelligenceReport({
     transcripts.map((transcript) => [transcript.id, transcript]),
   );
 
-  const topics = uniqueLabels(report.topics);
-  const companies = uniqueLabels(report.companies);
-  const technologies = uniqueLabels(report.technologies);
+  const evidenceCorpus = normalizationKey(
+    JSON.stringify({
+      people,
+      transcripts: transcripts.map((transcript) => transcript.raw_text),
+      event_insight: eventInsight
+        ? {
+            summary: eventInsight.summary,
+            key_topics: eventInsight.key_topics,
+            patterns: eventInsight.patterns,
+            recommended_next_actions:
+              eventInsight.recommended_next_actions,
+          }
+        : null,
+    }),
+  );
+  const groundedLabels = (values: string[]) =>
+    uniqueLabels(values)
+      .filter((value) => evidenceCorpus.includes(normalizationKey(value)))
+      .slice(0, 24);
+
+  const topics = groundedLabels(report.topics);
+  const companies = groundedLabels(report.companies);
+  const technologies = groundedLabels(report.technologies);
 
   const priorityPeople = report.priority_people
     .filter(
@@ -60,6 +88,7 @@ export function normalizeEventIntelligenceReport({
           (candidate) => candidate.person_id === item.person_id,
         ) === index,
     )
+    .slice(0, 12)
     .map((item) => {
       const person = peopleById.get(item.person_id);
       return {
@@ -70,8 +99,11 @@ export function normalizeEventIntelligenceReport({
 
   const followUpQueue = report.follow_up_queue
     .filter(
-      (item) => item.person_id === null || peopleById.has(item.person_id),
+      (item) =>
+        (item.person_id === null && item.person_name === null) ||
+        (item.person_id !== null && peopleById.has(item.person_id)),
     )
+    .slice(0, 16)
     .map((item) => {
       if (!item.person_id) {
         return { ...item, person_id: null, person_name: null };
@@ -85,6 +117,13 @@ export function normalizeEventIntelligenceReport({
     });
 
   const timeline = report.timeline
+    .filter(
+      (item) =>
+        transcripts.length === 0 ||
+        (item.transcript_id !== null &&
+          transcriptsById.has(item.transcript_id)),
+    )
+    .slice(0, 20)
     .map((item) => {
       const transcript = item.transcript_id
         ? transcriptsById.get(item.transcript_id)
@@ -121,10 +160,10 @@ export function normalizeEventIntelligenceReport({
         item.pattern.trim() &&
         patterns.findIndex(
           (candidate) =>
-            candidate.pattern.trim().toLocaleLowerCase() ===
-            item.pattern.trim().toLocaleLowerCase(),
+            normalizationKey(candidate.pattern) ===
+            normalizationKey(item.pattern),
         ) === index,
-    ),
+    ).slice(0, 10),
     priority_people: priorityPeople,
     follow_up_queue: followUpQueue,
     timeline,
@@ -142,6 +181,9 @@ export function normalizeEventIntelligenceReport({
         (person) => person.reconnect_priority === "high",
       ).length,
     },
+    overall_confidence: Number.isFinite(report.overall_confidence)
+      ? Math.min(1, Math.max(0, report.overall_confidence))
+      : 0,
   };
 
   return eventIntelligenceReportSchema.parse(normalizedReport);

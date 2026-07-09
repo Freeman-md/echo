@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
+
 import { memoryExtractionSchema } from "@/lib/memory/schema";
 import {
   storedEventIntelligenceSchema,
@@ -60,12 +62,14 @@ export async function loadEventIntelligenceSource(
         .from("people")
         .select("*")
         .eq("event_id", eventId)
-        .order("created_at", { ascending: true }),
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true }),
       supabase
         .from("transcripts")
         .select("*")
         .eq("event_id", eventId)
-        .order("created_at", { ascending: true }),
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true }),
       supabase
         .from("event_insights")
         .select("*")
@@ -136,13 +140,71 @@ export function findStoredEventIntelligence(
 }
 
 export function assertIntelligenceEvidence(source: EventIntelligenceSource) {
-  if (source.memoryInsight) return;
+  if (source.memoryInsight) {
+    const checkpoint = memoryExtractionSchema.safeParse(
+      source.memoryInsight.raw_json,
+    );
+
+    if (
+      checkpoint.success &&
+      checkpoint.data.people.length > 0 &&
+      source.people.length === 0
+    ) {
+      throw new EventIntelligenceServiceError(
+        "Remembered people are still being saved. Retry memory extraction, then try again.",
+        "missing_data",
+        409,
+      );
+    }
+
+    return;
+  }
 
   throw new EventIntelligenceServiceError(
     "Event memories are still being prepared. Finish memory extraction, then try again.",
     "missing_data",
     409,
   );
+}
+
+export function buildSourceFingerprint(
+  source: EventIntelligenceSource,
+): string {
+  const checkpoint = source.memoryInsight
+    ? memoryExtractionSchema.safeParse(source.memoryInsight.raw_json)
+    : null;
+  const evidence = {
+    event: {
+      id: source.event.id,
+      name: source.event.name,
+      location: source.event.location,
+      context: source.event.context,
+      started_at: source.event.started_at,
+      ended_at: source.event.ended_at,
+    },
+    people: source.people,
+    transcripts: source.transcripts.map((transcript) => ({
+      id: transcript.id,
+      raw_text: transcript.raw_text,
+      source: transcript.source,
+      created_at: transcript.created_at,
+    })),
+    memory_checkpoint: checkpoint?.success
+      ? checkpoint.data
+      : source.memoryInsight
+        ? {
+            summary: source.memoryInsight.summary,
+            key_topics: source.memoryInsight.key_topics,
+            patterns: source.memoryInsight.patterns,
+            recommended_next_actions:
+              source.memoryInsight.recommended_next_actions,
+          }
+        : null,
+  };
+
+  return createHash("sha256")
+    .update(JSON.stringify(evidence))
+    .digest("hex");
 }
 
 export function buildEventIntelligenceOverview(
@@ -178,12 +240,17 @@ export async function persistEventIntelligence(
   const intelligence: StoredEventIntelligence = {
     schema_version: 1,
     generated_at: generatedAt,
+    source_fingerprint: buildSourceFingerprint(source),
     report,
   };
-  const baseInsight = source.memoryInsight ?? source.insights[0] ?? null;
+  const baseInsight = source.insights[0] ?? source.memoryInsight ?? null;
   const existingRawJson =
     baseInsight?.raw_json && isObject(baseInsight.raw_json)
       ? baseInsight.raw_json
+      : {};
+  const memoryRawJson =
+    source.memoryInsight?.raw_json && isObject(source.memoryInsight.raw_json)
+      ? source.memoryInsight.raw_json
       : {};
   const insightValues = {
     summary: report.summary,
@@ -194,6 +261,7 @@ export async function persistEventIntelligence(
     ),
     raw_json: {
       ...existingRawJson,
+      ...memoryRawJson,
       event_intelligence: intelligence,
     },
   };

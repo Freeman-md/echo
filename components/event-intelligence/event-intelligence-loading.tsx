@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 const analysisSteps = [
   "Analysing event…",
   "Finding patterns…",
@@ -6,6 +10,18 @@ const analysisSteps = [
 ];
 
 export function EventIntelligenceLoading() {
+  const [activeStep, setActiveStep] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setActiveStep((current) =>
+        Math.min(current + 1, analysisSteps.length - 1),
+      );
+    }, 1_400);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
   return (
     <main className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute left-1/2 top-0 h-[32rem] w-[32rem] -translate-x-1/2 -translate-y-1/2 rounded-full border border-violet-300/[0.06]" />
@@ -36,13 +52,20 @@ export function EventIntelligenceLoading() {
             {analysisSteps.map((step, index) => (
               <li
                 key={step}
-                className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-black/20 px-4 py-3 text-sm text-slate-400"
+                aria-current={index === activeStep ? "step" : undefined}
+                className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition ${
+                  index <= activeStep
+                    ? "border-violet-300/10 bg-violet-300/[0.035] text-slate-300"
+                    : "border-white/[0.06] bg-black/20 text-slate-500"
+                }`}
               >
                 <span
                   className={`h-2 w-2 rounded-full ${
-                    index === 0
+                    index === activeStep
                       ? "animate-pulse bg-violet-300"
-                      : "bg-violet-300/25"
+                      : index < activeStep
+                        ? "bg-emerald-300/70"
+                        : "bg-violet-300/25"
                   }`}
                 />
                 {step}

@@ -57,6 +57,7 @@ function rawStringArray(
 
 function transcriptEvidence(transcripts: Transcript[]) {
   let remainingCharacters = MAX_TRANSCRIPT_EVIDENCE_CHARACTERS;
+  let includedCharacters = 0;
   const evidence: Array<{
     id: string;
     captured_at: string;
@@ -77,9 +78,20 @@ function transcriptEvidence(transcripts: Transcript[]) {
       text,
     });
     remainingCharacters -= text.length;
+    includedCharacters += text.length;
   }
 
-  return evidence;
+  const totalCharacters = transcripts.reduce(
+    (total, transcript) => total + transcript.raw_text.trim().length,
+    0,
+  );
+
+  return {
+    segments: evidence,
+    included_characters: includedCharacters,
+    total_characters: totalCharacters,
+    is_truncated: includedCharacters < totalCharacters,
+  };
 }
 
 export function buildEventIntelligencePrompt({
@@ -127,7 +139,7 @@ export function buildEventIntelligencePrompt({
             eventInsight.recommended_next_actions ?? [],
         }
       : null,
-    transcripts: transcriptEvidence(transcripts),
+    transcript_evidence: transcriptEvidence(transcripts),
   };
 
   return `
@@ -140,6 +152,8 @@ The metrics for conversations and people must match the supplied counts.
 Topic, company, and technology totals must match the unique evidence-backed
 items you return. Rank only supplied people. Build the timeline in chronological
 transcript order where timestamps exist; otherwise provide a conservative
-estimated sequence. Every recommendation should be specific enough to act on.
+estimated sequence. If transcript evidence is marked as truncated, avoid claims
+about exhaustive coverage and lower overall confidence. Every recommendation
+should be specific enough to act on.
 `.trim();
 }

@@ -106,7 +106,7 @@ export function EventIntelligenceReport({
                 className="rounded-2xl border border-white/[0.07] bg-white/[0.025] px-3 py-4"
               >
                 <p className="text-xl font-semibold text-white">{value}</p>
-                <p className="mt-1 text-[0.62rem] uppercase tracking-[0.14em] text-slate-600">
+                <p className="mt-1 text-[0.62rem] uppercase tracking-[0.14em] text-slate-400/75">
                   {label}
                 </p>
               </div>
@@ -147,7 +147,7 @@ export function EventIntelligenceReport({
                   <p className="text-2xl font-semibold tracking-tight text-white">
                     {value}
                   </p>
-                  <p className="mt-1 text-[0.62rem] uppercase leading-4 tracking-[0.12em] text-slate-600">
+                  <p className="mt-1 text-[0.62rem] uppercase leading-4 tracking-[0.12em] text-slate-400/75">
                     {label}
                   </p>
                 </div>
@@ -239,7 +239,7 @@ export function EventIntelligenceReport({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-[0.65rem] uppercase tracking-[0.16em] text-slate-600">
+                        <p className="text-[0.65rem] uppercase tracking-[0.16em] text-slate-400/75">
                           Connection {index + 1}
                         </p>
                         <h3 className="mt-1 text-lg font-semibold text-white">
@@ -254,7 +254,7 @@ export function EventIntelligenceReport({
                     </div>
 
                     <div className="mt-5">
-                      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-400/75">
                         Why they matter
                       </p>
                       <p className="mt-1.5 text-sm leading-6 text-slate-400">
@@ -302,7 +302,7 @@ export function EventIntelligenceReport({
                             {item.person_name}
                           </span>
                         )}
-                        <span className="rounded-full bg-white/[0.04] px-2 py-1 text-[0.62rem] uppercase tracking-[0.12em] text-slate-600">
+                        <span className="rounded-full bg-white/[0.04] px-2 py-1 text-[0.62rem] uppercase tracking-[0.12em] text-slate-400/75">
                           {timingLabel(item.timing)}
                         </span>
                       </div>
@@ -333,11 +333,11 @@ export function EventIntelligenceReport({
                 {report.timeline.map((item, index) => (
                   <li
                     key={`${item.sequence}-${item.title}`}
-                    className={
+                    className={`relative ${
                       index === report.timeline.length - 1 ? "" : "pb-7"
-                    }
+                    }`}
                   >
-                    <span className="absolute -left-[0.34rem] mt-1.5 h-2.5 w-2.5 rounded-full border-2 border-[#11131d] bg-violet-300" />
+                    <span className="absolute -left-[1.88rem] mt-1.5 h-2.5 w-2.5 rounded-full border-2 border-[#11131d] bg-violet-300" />
                     <p className="font-mono text-xs text-violet-300/70">
                       {item.time_label}
                     </p>
@@ -359,7 +359,7 @@ export function EventIntelligenceReport({
         </div>
 
         <div className="mt-8 flex flex-col items-center gap-3 border-t border-white/[0.06] pt-8 sm:flex-row sm:justify-between">
-          <p className="text-center text-xs text-slate-600 sm:text-left">
+          <p className="text-center text-xs text-slate-400/75 sm:text-left">
             Generated{" "}
             {new Date(result.generated_at).toLocaleDateString("en-GB", {
               dateStyle: "medium",
@@ -385,7 +385,7 @@ function TagGroup({ title, values }: { title: string; values: string[] }) {
 
   return (
     <div>
-      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-600">
+      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-400/75">
         {title}
       </p>
       <div className="mt-2 flex flex-wrap gap-1.5">
