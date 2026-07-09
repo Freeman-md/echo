@@ -2,11 +2,12 @@
 
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
+import { requestEventEnrichment } from "@/lib/event-enrichment/request-event-enrichment";
 import {
   inferEventDraft,
   isEventUrl,
 } from "@/lib/events/infer-event-draft";
-import type { EventDraft } from "@/types/event-lifecycle";
+import type { EventClue, EventDraft } from "@/types/event-lifecycle";
 
 interface EventClueInputProps {
   onDraftCreated: (draft: EventDraft) => void;
@@ -19,6 +20,7 @@ export function EventClueInput({
 }: EventClueInputProps) {
   const [clue, setClue] = useState("");
   const [image, setImage] = useState<File | null>(null);
+  const [isEnriching, setIsEnriching] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleClueChange(event: ChangeEvent<HTMLInputElement>) {
@@ -37,30 +39,67 @@ export function EventClueInput({
     if (selectedImage) setClue("");
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (image) {
-      onDraftCreated(
-        inferEventDraft({
+    const value = clue.trim();
+    if (!value && !image) return;
+
+    const eventClue: EventClue = image
+      ? {
           type: "image",
           value: image.name,
           fileName: image.name,
           fileType: image.type,
           fileSize: image.size,
-        }),
+        }
+      : {
+          type: isEventUrl(value) ? "url" : "text",
+          value,
+        };
+
+    setIsEnriching(true);
+
+    try {
+      const response = await requestEventEnrichment(
+        eventClue,
+        image ?? undefined,
       );
-      return;
+      onDraftCreated(response.draft);
+    } catch {
+      onDraftCreated({
+        ...inferEventDraft(eventClue),
+        enrichmentSource: "fallback",
+        enrichmentWarning:
+          "Echo could not reach event enrichment, so it created a quick draft from your original clue.",
+      });
     }
+  }
 
-    const value = clue.trim();
-    if (!value) return;
-
-    onDraftCreated(
-      inferEventDraft({
-        type: isEventUrl(value) ? "url" : "text",
-        value,
-      }),
+  if (isEnriching) {
+    return (
+      <section
+        aria-live="polite"
+        aria-busy="true"
+        className="mx-auto flex min-h-[40rem] w-full max-w-2xl flex-col items-center justify-center py-14 text-center sm:py-20"
+      >
+        <div className="relative flex h-28 w-28 items-center justify-center">
+          <span className="absolute h-full w-full animate-ping rounded-full border border-violet-300/10 [animation-duration:2.4s]" />
+          <span className="absolute h-20 w-20 rounded-full border border-violet-300/15 bg-violet-300/[0.035]" />
+          <span className="absolute h-12 w-12 rounded-full border border-violet-200/25 bg-violet-300/[0.07]" />
+          <span className="relative h-2.5 w-2.5 rounded-full bg-violet-100 shadow-[0_0_22px_rgba(196,181,253,0.9)]" />
+        </div>
+        <p className="mt-8 text-xs font-semibold uppercase tracking-[0.22em] text-violet-300">
+          Building your draft
+        </p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
+          Echo is learning about this event…
+        </h1>
+        <p className="mt-4 max-w-md text-sm leading-6 text-slate-500">
+          Reading the clue, finding useful context, and preparing your
+          networking focus.
+        </p>
+      </section>
     );
   }
 
@@ -86,7 +125,10 @@ export function EventClueInput({
         correction before Echo begins.
       </p>
 
-      <form onSubmit={handleSubmit} className="glass-card mt-9 rounded-[1.75rem] p-4 sm:p-6">
+      <form
+        onSubmit={(event) => void handleSubmit(event)}
+        className="glass-card mt-9 rounded-[1.75rem] p-4 sm:p-6"
+      >
         <div className="mb-4 flex flex-wrap gap-2">
           {["Paste event link", "Upload screenshot", "Type a short clue"].map(
             (option) => (
@@ -130,8 +172,8 @@ export function EventClueInput({
             </span>
             <span className="mt-0.5 block text-xs text-slate-500">
               {image
-                ? "Screenshot attached · metadata only"
-                : "Image stays in memory for now"}
+                ? "Ready for visual understanding"
+                : "Echo can understand an event screenshot"}
             </span>
           </span>
           <input

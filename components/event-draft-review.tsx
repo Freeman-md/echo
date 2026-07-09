@@ -39,7 +39,11 @@ export function EventDraftReview({
 
       <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-violet-300">
         <span className="h-1.5 w-1.5 rounded-full bg-violet-300 shadow-[0_0_9px_rgba(196,181,253,0.8)]" />
-        Draft ready
+        {editedDraft.enrichmentSource === "ai"
+          ? `AI event draft · ${Math.round(
+              (editedDraft.enrichment?.confidence ?? 0) * 100,
+            )}% confidence`
+          : "Draft ready"}
       </div>
       <h1 className="mt-3 text-4xl font-semibold tracking-[-0.045em] text-white sm:text-5xl">
         Does this feel right?
@@ -50,6 +54,12 @@ export function EventDraftReview({
       </p>
 
       <form onSubmit={handleSubmit} className="glass-card mt-8 rounded-[1.75rem] p-5 sm:p-7">
+        {editedDraft.enrichmentWarning && (
+          <p className="mb-5 rounded-2xl border border-amber-200/10 bg-amber-200/[0.04] px-4 py-3 text-sm leading-6 text-amber-100/75">
+            {editedDraft.enrichmentWarning}
+          </p>
+        )}
+
         <div className="space-y-5">
           <label className="block">
             <span className="mb-2 block text-xs font-medium uppercase tracking-[0.16em] text-slate-500">

@@ -43,9 +43,8 @@ export function isEventUrl(value: string): boolean {
 }
 
 /**
- * Milestone 1 uses intentionally simple, deterministic inference.
- * TODO(Milestone 2+): Replace this with server-side URL research, image
- * understanding, and AI enrichment while preserving the original clue.
+ * Fast, deterministic inference retained as a no-network fallback.
+ * The enrichment API uses this whenever webpage or OpenAI work cannot finish.
  */
 export function inferEventDraft(clue: EventClue): EventDraft {
   if (clue.type === "url") {
