@@ -11,6 +11,7 @@ import type { EventMemoryResponse } from "@/types/memory";
 
 interface AiMemoryViewProps {
   eventId: string;
+  onMemoryReady?: (result: EventMemoryResponse) => void;
 }
 
 type MemoryViewState =
@@ -24,7 +25,10 @@ type MemoryViewState =
 
 const priorityOrder = { high: 0, medium: 1, low: 2, unknown: 3 };
 
-export function AiMemoryView({ eventId }: AiMemoryViewProps) {
+export function AiMemoryView({
+  eventId,
+  onMemoryReady,
+}: AiMemoryViewProps) {
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<MemoryViewState>({
     status: "processing",
@@ -35,7 +39,10 @@ export function AiMemoryView({ eventId }: AiMemoryViewProps) {
 
     requestMemoryExtraction(eventId)
       .then((result) => {
-        if (active) setState({ status: "ready", result });
+        if (active) {
+          setState({ status: "ready", result });
+          onMemoryReady?.(result);
+        }
       })
       .catch((error: unknown) => {
         if (!active) return;
@@ -55,7 +62,7 @@ export function AiMemoryView({ eventId }: AiMemoryViewProps) {
     return () => {
       active = false;
     };
-  }, [attempt, eventId]);
+  }, [attempt, eventId, onMemoryReady]);
 
   function retry() {
     setState({ status: "processing" });
