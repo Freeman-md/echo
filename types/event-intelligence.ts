@@ -21,6 +21,7 @@ export interface EventIntelligenceResponse {
 
 export type EventIntelligenceErrorCode =
   | "invalid_request"
+  | "unauthorized"
   | "event_not_found"
   | "event_not_completed"
   | "missing_data"
