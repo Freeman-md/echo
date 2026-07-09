@@ -1,6 +1,6 @@
 "use client";
 
-import { AiMemoryView } from "@/components/ai-memory-view";
+import { MemoryCardsView } from "@/components/memory-cards/memory-cards-view";
 import type { Event } from "@/types";
 
 interface CompletedEventShellProps {
@@ -44,7 +44,7 @@ export function CompletedEventShell({
         </p>
       </div>
 
-      <AiMemoryView key={event.id} eventId={event.id} />
+      <MemoryCardsView key={event.id} event={event} />
 
       <button
         type="button"
