@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { MemoryCardsView } from "@/components/memory-cards/memory-cards-view";
 import type { Event } from "@/types";
 
@@ -46,10 +48,18 @@ export function CompletedEventShell({
 
       <MemoryCardsView key={event.id} event={event} />
 
+      <Link
+        href={`/events/${event.id}/intelligence`}
+        className="button-primary mx-auto mt-8 flex w-fit justify-center"
+      >
+        View Event Intelligence
+        <span aria-hidden="true">→</span>
+      </Link>
+
       <button
         type="button"
         onClick={onReset}
-        className="button-secondary mx-auto mt-7 flex justify-center"
+        className="button-secondary mx-auto mt-3 flex justify-center"
       >
         Return home
       </button>
