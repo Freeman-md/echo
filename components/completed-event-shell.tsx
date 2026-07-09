@@ -46,10 +46,18 @@ export function CompletedEventShell({
 
       <AiMemoryView key={event.id} eventId={event.id} />
 
+      <a
+        href={`/events/${event.id}/intelligence`}
+        className="button-primary mx-auto mt-8 flex w-fit justify-center"
+      >
+        View Event Intelligence
+        <span aria-hidden="true">→</span>
+      </a>
+
       <button
         type="button"
         onClick={onReset}
-        className="button-secondary mx-auto mt-7 flex justify-center"
+        className="button-secondary mx-auto mt-3 flex justify-center"
       >
         Return home
       </button>
