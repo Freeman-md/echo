@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z, ZodError } from "zod";
 
 import { generateEventIntelligence } from "@/lib/intelligence/generate-event-intelligence";
@@ -15,6 +16,11 @@ import {
   type EventIntelligenceSource,
   type StoredReportMatch,
 } from "@/lib/services/event-intelligence-service";
+import {
+  ApiAuthenticationError,
+  authenticateApiRequest,
+  type AuthenticatedApiContext,
+} from "@/lib/supabase/api-auth";
 import type {
   EventIntelligenceError,
   EventIntelligenceResponse,
@@ -57,10 +63,11 @@ function storedResponse(
 }
 
 async function processEventIntelligence(
+  supabase: SupabaseClient,
   eventId: string,
   regenerate: boolean,
 ): Promise<EventIntelligenceResponse> {
-  const source = await loadEventIntelligenceSource(eventId);
+  const source = await loadEventIntelligenceSource(supabase, eventId);
   const overview = buildEventIntelligenceOverview(source);
   const stored = findStoredEventIntelligence(source.insights);
   const sourceFingerprint = buildSourceFingerprint(source);
@@ -133,7 +140,7 @@ async function processEventIntelligence(
   }
 
   try {
-    const persisted = await persistEventIntelligence(source, report);
+    const persisted = await persistEventIntelligence(supabase, source, report);
     return {
       overview,
       report: persisted.report,
@@ -155,10 +162,12 @@ async function processEventIntelligence(
 }
 
 function scheduleEventIntelligence(
+  supabase: SupabaseClient,
+  jobKey: string,
   eventId: string,
   regenerate: boolean,
 ): Promise<EventIntelligenceResponse> {
-  const current = activeReports.get(eventId);
+  const current = activeReports.get(jobKey);
 
   if (current && (!regenerate || current.regenerate)) {
     return current.promise;
@@ -167,13 +176,13 @@ function scheduleEventIntelligence(
   const promise = current
     ? current.promise
         .catch(() => undefined)
-        .then(() => processEventIntelligence(eventId, true))
-    : processEventIntelligence(eventId, regenerate);
+        .then(() => processEventIntelligence(supabase, eventId, true))
+    : processEventIntelligence(supabase, eventId, regenerate);
 
-  activeReports.set(eventId, { regenerate, promise });
+  activeReports.set(jobKey, { regenerate, promise });
   const clearJob = () => {
-    if (activeReports.get(eventId)?.promise === promise) {
-      activeReports.delete(eventId);
+    if (activeReports.get(jobKey)?.promise === promise) {
+      activeReports.delete(jobKey);
     }
   };
   void promise.then(clearJob, clearJob);
@@ -184,6 +193,22 @@ function scheduleEventIntelligence(
 export async function POST(request: Request) {
   let eventId: string;
   let regenerate: boolean;
+  let auth: AuthenticatedApiContext;
+
+  try {
+    auth = await authenticateApiRequest(request);
+  } catch (error) {
+    return NextResponse.json<EventIntelligenceError>(
+      {
+        error:
+          error instanceof ApiAuthenticationError
+            ? error.message
+            : "Sign in before generating Event Intelligence.",
+        code: "unauthorized",
+      },
+      { status: 401 },
+    );
+  }
 
   try {
     const body = requestSchema.parse(await request.json());
@@ -199,7 +224,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const job = scheduleEventIntelligence(eventId, regenerate);
+  const jobKey = `${auth.user.id}:${eventId}`;
+  const job = scheduleEventIntelligence(
+    auth.supabase,
+    jobKey,
+    eventId,
+    regenerate,
+  );
 
   try {
     return NextResponse.json<EventIntelligenceResponse>(await job);
