@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+
+import { ConversationCapture } from "@/components/conversation-capture";
 import type { Event } from "@/types";
 
 interface ActiveEventViewProps {
@@ -15,13 +18,14 @@ export function ActiveEventView({
   error,
   onEnd,
 }: ActiveEventViewProps) {
+  const [isCaptureActive, setIsCaptureActive] = useState(false);
   const startedAt = new Intl.DateTimeFormat(undefined, {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(event.started_at));
 
   return (
-    <section className="mx-auto flex min-h-[42rem] w-full max-w-2xl flex-col justify-center py-14 sm:py-20">
+    <section className="mx-auto w-full max-w-3xl py-10 sm:py-14">
       <div className="glass-card relative overflow-hidden rounded-[2rem] p-6 sm:p-9">
         <div className="pointer-events-none absolute left-1/2 top-0 h-52 w-52 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-300/10 blur-3xl" />
 
@@ -32,22 +36,16 @@ export function ActiveEventView({
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-50" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300" />
               </span>
-              Active · Listening
+              Active event
             </span>
             <span className="text-xs text-slate-500">Started {startedAt}</span>
           </div>
 
-          <div className="py-14 text-center sm:py-16">
-            <div className="mx-auto mb-7 flex h-20 w-20 items-center justify-center rounded-full border border-white/[0.07] bg-white/[0.035]">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-violet-300/20 bg-violet-300/[0.07]">
-                <span className="h-3 w-3 rounded-full bg-violet-200 shadow-[0_0_18px_rgba(196,181,253,0.9)]" />
-              </div>
-            </div>
-
+          <div className="py-9 text-center sm:py-11">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
               Echo is present
             </p>
-            <h1 className="mx-auto mt-3 max-w-lg text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl">
+            <h1 className="mx-auto mt-3 max-w-lg text-4xl font-semibold tracking-[-0.05em] text-white">
               {event.name ?? "Untitled event"}
             </h1>
             {event.location && (
@@ -60,14 +58,10 @@ export function ActiveEventView({
             )}
           </div>
 
-          <div className="rounded-2xl border border-white/[0.06] bg-black/20 px-4 py-4 text-center">
-            <p className="text-sm text-slate-400">
-              Conversation capture arrives in Milestone 2.
-            </p>
-            <p className="mt-1 text-xs text-slate-600">
-              No audio is being recorded in this milestone.
-            </p>
-          </div>
+          <ConversationCapture
+            eventId={event.id}
+            onCaptureActivityChange={setIsCaptureActive}
+          />
 
           {error && (
             <p
@@ -81,10 +75,14 @@ export function ActiveEventView({
           <button
             type="button"
             onClick={onEnd}
-            disabled={isEnding}
+            disabled={isEnding || isCaptureActive}
             className="mt-5 flex min-h-12 w-full items-center justify-center rounded-full border border-rose-200/10 bg-rose-200/[0.055] px-5 text-sm font-semibold text-rose-100 transition hover:border-rose-200/20 hover:bg-rose-200/[0.09] disabled:cursor-wait disabled:opacity-50"
           >
-            {isEnding ? "Ending event…" : "End Event"}
+            {isEnding
+              ? "Ending event…"
+              : isCaptureActive
+                ? "Finish capture before ending"
+                : "End Event"}
           </button>
         </div>
       </div>
