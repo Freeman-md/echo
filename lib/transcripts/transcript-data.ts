@@ -35,3 +35,19 @@ export async function createTranscript({
 
   return data as Transcript;
 }
+
+export async function listTranscriptsForEvent(
+  eventId: string,
+): Promise<Transcript[]> {
+  const { data, error } = await getSupabaseClient()
+    .from("transcripts")
+    .select("*")
+    .eq("event_id", eventId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw new Error(`Could not load conversation batches: ${error.message}`);
+  }
+
+  return (data ?? []) as Transcript[];
+}
