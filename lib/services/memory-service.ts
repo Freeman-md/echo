@@ -198,8 +198,6 @@ export async function persistExtractedMemory(
   supabase: SupabaseClient,
   eventId: string,
   memory: MemoryExtraction,
-  _existingPeople: PersonMemory[] = [],
-  _replaceExisting = false,
 ): Promise<PersistedEventMemory> {
   const insightRow = toEventInsightRow(eventId, memory);
   const peopleRows = toPersonRows(eventId, memory);

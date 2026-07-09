@@ -92,8 +92,6 @@ async function processEventMemory(
     supabase,
     eventId,
     memory,
-    persisted.people,
-    forceRefresh,
   );
 
   if (!saved.eventInsight) {
