@@ -99,6 +99,28 @@ a {
   background: rgba(255, 255, 255, 0.085);
 }
 
+.event-field {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  outline: none;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 0.85rem 1rem;
+  color: #f4f4f7;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.event-field::placeholder {
+  color: #4b5563;
+}
+
+.event-field:focus {
+  border-color: rgba(196, 181, 253, 0.35);
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.06);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

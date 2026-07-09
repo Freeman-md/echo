@@ -2,9 +2,9 @@
 
 Never forget a conversation again.
 
-Echo is an AI memory system for real-world networking events. This repository
-currently contains the Milestone 0 foundation: a mobile-first Next.js shell,
-Supabase persistence, core data types, and a database connection smoke test.
+Echo is an AI memory system for real-world networking events. The current
+Milestone 1 build adds a lightweight event-clue flow, editable draft, persistent
+active event, and completed event shell to the mobile-first foundation.
 
 ## Run locally
 
@@ -44,7 +44,20 @@ including their foreign keys and indexes. It enables RLS with deliberately
 permissive anonymous demo policies. Replace those policies with user-scoped
 ownership before storing real conversation data.
 
-## Test the connection
+## Test the event lifecycle
+
+1. Start the app and select **Start Event**.
+2. Enter a short clue or event URL, or select an image.
+3. Select **Create Event Draft** and optionally make a small correction.
+4. Select **Start Listening** and verify an active row appears in Supabase.
+5. Select **End Event** and verify that row has `status = completed` and an
+   `ended_at` timestamp.
+
+URL names and screenshot metadata are inferred locally with deterministic
+logic. Screenshots are not uploaded. URL research, image understanding, audio,
+transcription, and AI enrichment are intentionally deferred.
+
+## Test the connection smoke test
 
 1. Start the app and open `http://localhost:3000`.
 2. Scroll to **Supabase connection**.
@@ -66,7 +79,7 @@ npm run build
 
 ## Milestone boundary
 
-Milestone 0 does not include event lifecycle behavior, authentication, audio,
-AI integration, extraction, or demo mode. The project is ready for Milestone 1
-to add event creation, active-event state, and event completion on top of the
-existing `events` table and device-session helper.
+Milestone 1 does not include authentication, audio, transcription, OCR, web
+research, AI integration, memory extraction, storage uploads, or demo mode.
+React state is intentionally ephemeral, and application data is persisted only
+to Supabase when the user starts or completes an event.

@@ -64,11 +64,13 @@ grant select, insert, update on public.transcripts to anon;
 grant select, insert, update on public.people to anon;
 grant select, insert, update on public.event_insights to anon;
 
--- Milestone 0 demo policies. With no authentication or durable device identity
--- yet, ownership cannot be enforced securely. These policies intentionally
--- allow the anon role to read, insert, and update demo data, but not delete it.
--- TODO: Replace these policies with user-scoped ownership policies as soon as
--- authentication is introduced, before storing real conversation data.
+-- Demo-grade hackathon policies for Milestones 0–1. Anonymous users can
+-- currently read, insert, and update all demo rows, but cannot delete them.
+-- device_session_id is useful continuity metadata only; it does NOT provide
+-- secure row ownership and must not be treated as an authorization boundary.
+-- TODO: Before storing sensitive conversations, move writes behind
+-- server-owned sessions or authentication and replace these policies with
+-- ownership-scoped checks.
 create policy "anon can read demo events"
   on public.events for select to anon using (true);
 create policy "anon can insert demo events"
