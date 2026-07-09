@@ -120,8 +120,10 @@ export function requestTranscription(
     request.addEventListener("error", () => {
       reject(
         new TranscriptionRequestError(
-          "UPLOAD_FAILED",
-          "The audio upload failed. Check your connection and try again.",
+          uploadCompleted ? "TRANSCRIPTION_FAILED" : "UPLOAD_FAILED",
+          uploadCompleted
+            ? "The connection was lost during transcription. Check your connection and retry."
+            : "The audio upload failed. Check your connection and try again.",
         ),
       );
     });

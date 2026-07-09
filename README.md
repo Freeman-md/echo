@@ -82,9 +82,10 @@ conversation transcripts retain generic speaker turns. The resulting text is
 stored in `public.transcripts.raw_text` with its current `event_id` and a
 `source` of `microphone`, `upload`, or `manual`. Audio itself is not persisted.
 
-OpenAI accepts supported audio files smaller than 25 MB. If recording is
-unavailable or any audio step fails, the active event screen always keeps audio
-upload and manual transcript paste available.
+Echo accepts supported audio files smaller than 4 MB so multipart uploads stay
+below the deployed function request limit. If recording is unavailable or any
+audio step fails, the active event screen always keeps audio upload and manual
+transcript paste available.
 
 ## Test the connection smoke test
 

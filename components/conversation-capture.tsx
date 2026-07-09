@@ -59,6 +59,7 @@ interface RetryAudio {
 }
 
 interface RetryTranscript {
+  id: string;
   rawText: string;
   source: TranscriptSource;
 }
@@ -119,7 +120,13 @@ function MicrophoneIcon() {
   );
 }
 
-function CaptureProgress({ status }: { status: CaptureStatus }) {
+function CaptureProgress({
+  status,
+  uploadProgress,
+}: {
+  status: CaptureStatus;
+  uploadProgress: number;
+}) {
   if (
     status !== "uploading" &&
     status !== "transcribing" &&
@@ -138,7 +145,11 @@ function CaptureProgress({ status }: { status: CaptureStatus }) {
       className="mt-5 grid grid-cols-3 gap-2"
     >
       {steps.map((step, index) => (
-        <li key={step} className="min-w-0">
+        <li
+          key={step}
+          aria-current={index === activeIndex ? "step" : undefined}
+          className="min-w-0"
+        >
           <span
             className={`block h-1 rounded-full transition ${
               index < activeIndex
@@ -154,6 +165,16 @@ function CaptureProgress({ status }: { status: CaptureStatus }) {
             }`}
           >
             {step}
+            {status === "uploading" && index === 0
+              ? ` ${uploadProgress}%`
+              : ""}
+            <span className="sr-only">
+              {index < activeIndex
+                ? " complete"
+                : index === activeIndex
+                  ? " in progress"
+                  : " pending"}
+            </span>
           </span>
         </li>
       ))}
@@ -167,6 +188,7 @@ export function ConversationCapture({
 }: ConversationCaptureProps) {
   const recorderRef = useRef<AudioRecordingSession | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isMountedRef = useRef(true);
   const [status, setStatus] = useState<CaptureStatus>("idle");
   const [durationSeconds, setDurationSeconds] = useState(0);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -181,7 +203,10 @@ export function ConversationCapture({
     useState<RetryTranscript | null>(null);
 
   useEffect(() => {
-    return () => recorderRef.current?.cancel();
+    return () => {
+      isMountedRef.current = false;
+      recorderRef.current?.cancel();
+    };
   }, []);
 
   function transition(nextStatus: CaptureStatus) {
@@ -212,15 +237,17 @@ export function ConversationCapture({
   async function saveTranscript(
     rawText: string,
     source: TranscriptSource,
+    transcriptId = crypto.randomUUID(),
   ) {
     const transcript = rawText.trim();
     setFailure(null);
     setTranscriptPreview(transcript);
-    setRetryTranscript({ rawText: transcript, source });
+    setRetryTranscript({ id: transcriptId, rawText: transcript, source });
     transition("saving");
 
     try {
       const saved = await createTranscript({
+        id: transcriptId,
         eventId,
         rawText: transcript,
         source,
@@ -302,9 +329,17 @@ export function ConversationCapture({
           showFailure("recording", error.message);
         },
       });
+
+      if (!isMountedRef.current) {
+        session.cancel();
+        return;
+      }
+
       recorderRef.current = session;
       transition("recording");
     } catch (error) {
+      if (!isMountedRef.current) return;
+
       if (error instanceof AudioRecordingError) {
         showFailure(
           error.code === "RECORDING_FAILED" ? "recording" : "microphone",
@@ -356,7 +391,11 @@ export function ConversationCapture({
 
   function retryLastStep() {
     if (failure?.kind === "supabase" && retryTranscript) {
-      void saveTranscript(retryTranscript.rawText, retryTranscript.source);
+      void saveTranscript(
+        retryTranscript.rawText,
+        retryTranscript.source,
+        retryTranscript.id,
+      );
       return;
     }
 
@@ -375,11 +414,11 @@ export function ConversationCapture({
     status === "requesting"
       ? "Requesting microphone access"
       : status === "recording"
-        ? `Recording · ${formatDuration(durationSeconds)}`
+        ? "Recording in progress"
         : status === "stopping"
           ? "Preparing your recording"
           : status === "uploading"
-            ? `Uploading audio · ${uploadProgress}%`
+            ? "Uploading audio"
             : status === "transcribing"
               ? "OpenAI is transcribing"
               : status === "saving"
@@ -428,7 +467,7 @@ export function ConversationCapture({
         </div>
       </div>
 
-      <CaptureProgress status={status} />
+      <CaptureProgress status={status} uploadProgress={uploadProgress} />
 
       {status !== "success" && (
         <>
@@ -460,28 +499,31 @@ export function ConversationCapture({
                 : "Your browser will ask for microphone access."}
             </p>
 
-            {isRecording ? (
-              <button
-                type="button"
-                onClick={() => void stopRecording()}
-                className="mt-5 inline-flex min-h-12 items-center justify-center rounded-full border border-rose-200/20 bg-rose-200/[0.09] px-6 text-sm font-semibold text-rose-100 transition hover:bg-rose-200/[0.14]"
-              >
-                <span className="mr-2 h-2.5 w-2.5 rounded-sm bg-rose-200" />
-                Stop Recording
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => void startRecording()}
-                disabled={isBusy}
-                className="button-primary mt-5 justify-center disabled:cursor-wait disabled:opacity-50"
-              >
-                <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
-                {status === "requesting"
+            <button
+              type="button"
+              onClick={() =>
+                isRecording ? void stopRecording() : void startRecording()
+              }
+              disabled={isBusy && !isRecording}
+              className={
+                isRecording
+                  ? "mt-5 inline-flex min-h-12 items-center justify-center rounded-full border border-rose-200/20 bg-rose-200/[0.09] px-6 text-sm font-semibold text-rose-100 transition hover:bg-rose-200/[0.14]"
+                  : "button-primary mt-5 justify-center disabled:cursor-wait disabled:opacity-50"
+              }
+            >
+              <span
+                className={
+                  isRecording
+                    ? "mr-2 h-2.5 w-2.5 rounded-sm bg-rose-200"
+                    : "h-2.5 w-2.5 rounded-full bg-rose-500"
+                }
+              />
+              {isRecording
+                ? "Stop Recording"
+                : status === "requesting"
                   ? "Opening microphone…"
                   : "Start Recording"}
-              </button>
-            )}
+            </button>
           </div>
 
           {failure && (
@@ -534,7 +576,7 @@ export function ConversationCapture({
               className={`flex min-h-28 items-center gap-3 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-4 transition ${
                 isBusy || isRecording
                   ? "cursor-not-allowed opacity-45"
-                  : "cursor-pointer hover:border-white/20 hover:bg-white/[0.035]"
+                  : "cursor-pointer hover:border-white/20 hover:bg-white/[0.035] focus-within:border-violet-300/35 focus-within:ring-4 focus-within:ring-violet-400/[0.06]"
               }`}
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-300/10 text-violet-200">
@@ -545,7 +587,7 @@ export function ConversationCapture({
                   Upload audio
                 </span>
                 <span className="mt-1 block text-xs leading-5 text-slate-500">
-                  MP3, M4A, WAV, WebM, or another supported format under 25 MB.
+                  MP3, M4A, WAV, WebM, or another supported format under 4 MB.
                 </span>
               </span>
               <input

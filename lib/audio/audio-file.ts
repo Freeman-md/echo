@@ -1,4 +1,5 @@
-export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+// Leave room below Vercel's 4.5 MB request-body limit for multipart headers.
+export const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
 
 export const AUDIO_FILE_ACCEPT = [
   ".flac",
@@ -66,7 +67,7 @@ export function validateAudioFile(file: File): AudioFileValidationError | null {
     return {
       code: "FILE_TOO_LARGE",
       message:
-        "Audio must be smaller than 25 MB. Choose a shorter or compressed recording.",
+        "Audio must be smaller than 4 MB. Choose a shorter or compressed recording.",
     };
   }
 

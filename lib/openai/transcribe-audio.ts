@@ -64,7 +64,8 @@ export async function transcribeAudio(audio: File): Promise<string> {
       chunking_strategy: "auto",
     },
     {
-      timeout: 120_000,
+      timeout: 100_000,
+      maxRetries: 0,
     },
   );
 

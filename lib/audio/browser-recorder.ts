@@ -113,7 +113,7 @@ export async function startAudioRecording({
   try {
     recorder = new MediaRecorder(stream, {
       ...(mimeType ? { mimeType } : {}),
-      audioBitsPerSecond: 64_000,
+      audioBitsPerSecond: 48_000,
     });
   } catch {
     for (const track of stream.getTracks()) track.stop();
