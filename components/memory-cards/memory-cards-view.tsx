@@ -15,6 +15,7 @@ import type { EventMemoryData } from "@/types/memory-cards";
 interface MemoryCardsViewProps {
   event: Event;
   autoExtract?: boolean;
+  onProcessingChange?: (isProcessing: boolean) => void;
 }
 
 type MemoryCardsState =
@@ -25,6 +26,7 @@ type MemoryCardsState =
 export function MemoryCardsView({
   event,
   autoExtract = true,
+  onProcessingChange,
 }: MemoryCardsViewProps) {
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<MemoryCardsState>({ status: "loading" });
@@ -71,6 +73,7 @@ export function MemoryCardsView({
 
   async function refreshMemory() {
     setIsRefreshing(true);
+    onProcessingChange?.(true);
     setRefreshError(null);
 
     try {
@@ -85,6 +88,7 @@ export function MemoryCardsView({
       );
     } finally {
       setIsRefreshing(false);
+      onProcessingChange?.(false);
     }
   }
 

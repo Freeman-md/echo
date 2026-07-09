@@ -15,6 +15,7 @@ import type {
 } from "@/types/memory";
 
 const MAX_TRANSCRIPT_CHARACTERS = 80_000;
+const TRANSCRIPT_SEPARATOR = "\n\n--- Conversation segment ---\n\n";
 
 export class MemoryServiceError extends Error {
   constructor(
@@ -39,6 +40,31 @@ export interface PersistedEventMemory {
 
 function databaseError(message: string): MemoryServiceError {
   return new MemoryServiceError(message, "database_error", 500);
+}
+
+function combineTranscriptSegments(transcripts: Transcript[]): string {
+  const segments = transcripts
+    .map((item) => item.raw_text.trim())
+    .filter(Boolean);
+  if (segments.length === 0) return "";
+
+  const separatorCharacters =
+    TRANSCRIPT_SEPARATOR.length * Math.max(0, segments.length - 1);
+  const segmentBudget = Math.max(
+    1,
+    Math.floor(
+      (MAX_TRANSCRIPT_CHARACTERS - separatorCharacters) / segments.length,
+    ),
+  );
+
+  return segments
+    .map((segment) =>
+      segment.length > segmentBudget
+        ? `${segment.slice(0, Math.max(1, segmentBudget - 1))}…`
+        : segment,
+    )
+    .join(TRANSCRIPT_SEPARATOR)
+    .slice(0, MAX_TRANSCRIPT_CHARACTERS);
 }
 
 export async function loadMemorySource(
@@ -85,11 +111,7 @@ export async function loadMemorySource(
   }
 
   const transcripts = (transcriptResult.data ?? []) as Transcript[];
-  const transcript = transcripts
-    .map((item) => item.raw_text.trim())
-    .filter(Boolean)
-    .join("\n\n--- Conversation segment ---\n\n")
-    .slice(0, MAX_TRANSCRIPT_CHARACTERS);
+  const transcript = combineTranscriptSegments(transcripts);
 
   if (!transcript) {
     throw new MemoryServiceError(
@@ -176,59 +198,24 @@ export async function persistExtractedMemory(
   supabase: SupabaseClient,
   eventId: string,
   memory: MemoryExtraction,
-  existingPeople: PersonMemory[] = [],
-  replaceExisting = false,
+  _existingPeople: PersonMemory[] = [],
+  _replaceExisting = false,
 ): Promise<PersistedEventMemory> {
-  if (replaceExisting) {
-    const [peopleDelete, insightDelete] = await Promise.all([
-      supabase.from("people").delete().eq("event_id", eventId),
-      supabase.from("event_insights").delete().eq("event_id", eventId),
-    ]);
-
-    if (peopleDelete.error || insightDelete.error) {
-      throw databaseError(
-        `Could not replace existing memory: ${
-          peopleDelete.error?.message ??
-          insightDelete.error?.message ??
-          "Unknown database error"
-        }`,
-      );
-    }
-    existingPeople = [];
-  }
-
   const insightRow = toEventInsightRow(eventId, memory);
-  const { data: insight, error: insightError } = await supabase
-    .from("event_insights")
-    .insert(insightRow)
-    .select("*")
-    .single();
+  const peopleRows = toPersonRows(eventId, memory);
+  const { error } = await supabase.rpc("replace_event_memory", {
+    p_event_id: eventId,
+    p_people: peopleRows,
+    p_insight: insightRow,
+  });
 
-  if (insightError) {
+  if (error) {
     throw databaseError(
-      `Could not save event insight: ${insightError.message}`,
+      `Could not atomically save event memory: ${error.message}`,
     );
   }
 
-  let people = existingPeople;
-  if (people.length === 0 && memory.people.length > 0) {
-    const { data, error } = await supabase
-      .from("people")
-      .insert(toPersonRows(eventId, memory))
-      .select("*");
-
-    if (error) {
-      throw databaseError(
-        `Event insight was saved, but people memories need retrying: ${error.message}`,
-      );
-    }
-    people = (data ?? []) as PersonMemory[];
-  }
-
-  return {
-    people,
-    eventInsight: insight as EventInsight,
-  };
+  return loadPersistedEventMemory(supabase, eventId);
 }
 
 export async function repairPeopleFromCheckpoint(
@@ -241,17 +228,5 @@ export async function repairPeopleFromCheckpoint(
     return { people: [], eventInsight };
   }
 
-  const { data, error } = await supabase
-    .from("people")
-    .insert(toPersonRows(eventId, memory))
-    .select("*");
-
-  if (error) {
-    throw databaseError(`Could not restore people memories: ${error.message}`);
-  }
-
-  return {
-    people: (data ?? []) as PersonMemory[],
-    eventInsight,
-  };
+  return persistExtractedMemory(supabase, eventId, memory);
 }

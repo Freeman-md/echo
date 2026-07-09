@@ -3,12 +3,14 @@ import type { Transcript } from "@/types";
 import type { TranscriptSource } from "@/types/conversation-capture";
 
 interface CreateTranscriptInput {
+  id: string;
   eventId: string;
   rawText: string;
   source: TranscriptSource;
 }
 
 export async function createTranscript({
+  id,
   eventId,
   rawText,
   source,
@@ -21,11 +23,12 @@ export async function createTranscript({
 
   const { data, error } = await getSupabaseClient()
     .from("transcripts")
-    .insert({
+    .upsert({
+      id,
       event_id: eventId,
       raw_text: transcript,
       source,
-    })
+    }, { onConflict: "id" })
     .select("*")
     .single();
 

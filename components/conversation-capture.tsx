@@ -62,6 +62,7 @@ interface RetryAudio {
 }
 
 interface RetryTranscript {
+  id: string;
   rawText: string;
   source: TranscriptSource;
 }
@@ -182,6 +183,7 @@ export function ConversationCapture({
   onCaptureActivityChange,
 }: ConversationCaptureProps) {
   const recorderRef = useRef<AudioRecordingSession | null>(null);
+  const saveInFlightRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<CaptureStatus>("idle");
   const [durationSeconds, setDurationSeconds] = useState(0);
@@ -208,7 +210,16 @@ export function ConversationCapture({
     listTranscriptsForEvent(eventId)
       .then((segments) => {
         if (!active) return;
-        setSavedSegments(segments);
+        setSavedSegments((current) => {
+          const byId = new Map(
+            [...segments, ...current].map((segment) => [segment.id, segment]),
+          );
+          return [...byId.values()].sort(
+            (left, right) =>
+              new Date(left.created_at).getTime() -
+              new Date(right.created_at).getTime(),
+          );
+        });
         setSegmentsError(null);
       })
       .catch((error: unknown) => {
@@ -253,15 +264,19 @@ export function ConversationCapture({
   async function saveTranscript(
     rawText: string,
     source: TranscriptSource,
+    transcriptId = crypto.randomUUID(),
   ) {
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
     const transcript = rawText.trim();
     setFailure(null);
     setTranscriptPreview(transcript);
-    setRetryTranscript({ rawText: transcript, source });
+    setRetryTranscript({ id: transcriptId, rawText: transcript, source });
     transition("saving");
 
     try {
       const saved = await createTranscript({
+        id: transcriptId,
         eventId,
         rawText: transcript,
         source,
@@ -274,6 +289,7 @@ export function ConversationCapture({
       setRetryAudio(null);
       setRetryTranscript(null);
       setFailure(null);
+      setSegmentsError(null);
       transition("success");
     } catch (error) {
       showFailure(
@@ -282,6 +298,8 @@ export function ConversationCapture({
           ? error.message
           : "Supabase could not save this transcript. Retry without recording again.",
       );
+    } finally {
+      saveInFlightRef.current = false;
     }
   }
 
@@ -401,7 +419,11 @@ export function ConversationCapture({
 
   function retryLastStep() {
     if (failure?.kind === "supabase" && retryTranscript) {
-      void saveTranscript(retryTranscript.rawText, retryTranscript.source);
+      void saveTranscript(
+        retryTranscript.rawText,
+        retryTranscript.source,
+        retryTranscript.id,
+      );
       return;
     }
 
