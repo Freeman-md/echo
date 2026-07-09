@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+:root {
+  --background: #07080d;
+  --foreground: #f7f7fb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--background);
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at 50% -10%, rgba(137, 92, 246, 0.15), transparent 34rem),
+    radial-gradient(circle at 0% 28%, rgba(66, 211, 199, 0.06), transparent 24rem),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: rgba(167, 139, 250, 0.35);
+  color: white;
+}
+
+.glass-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
+    rgba(12, 13, 21, 0.74);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(18px);
+}
+
+.button-primary {
+  display: inline-flex;
+  min-height: 3.25rem;
+  align-items: center;
+  gap: 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 9999px;
+  background: linear-gradient(120deg, #f6f2ff, #d8cdfd);
+  padding: 0.8rem 1.35rem;
+  color: #171320;
+  font-size: 0.9rem;
+  font-weight: 650;
+  box-shadow:
+    0 10px 35px rgba(139, 92, 246, 0.2),
+    inset 0 1px 0 white;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.button-primary:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 14px 40px rgba(139, 92, 246, 0.28),
+    inset 0 1px 0 white;
+}
+
+.button-primary:active {
+  transform: translateY(0);
+}
+
+.button-secondary {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.055);
+  padding: 0.65rem 1.15rem;
+  color: #e6e5eb;
+  font-size: 0.875rem;
+  font-weight: 550;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease;
+}
+
+.button-secondary:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.085);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
